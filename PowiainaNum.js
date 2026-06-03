@@ -1,217 +1,92 @@
-(function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
-  typeof define === 'function' && define.amd ? define(['exports'], factory) :
-  (global = typeof globalThis !== 'undefined' ? globalThis : global || self, factory(global.PowiainaNum = {}));
-})(this, (function (exports) { 'use strict';
+/Author: dlsdl v1.1
+//Add support for very small numbers ,add more hyper operations and fix bugs
+//Code snippets and templates from OmegaNum.js
 
-  function _arrayLikeToArray(r, a) {
-    (null == a || a > r.length) && (a = r.length);
-    for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e];
-    return n;
-  }
-  function _arrayWithHoles(r) {
-    if (Array.isArray(r)) return r;
-  }
-  function _arrayWithoutHoles(r) {
-    if (Array.isArray(r)) return _arrayLikeToArray(r);
-  }
-  function _classCallCheck(a, n) {
-    if (!(a instanceof n)) throw new TypeError("Cannot call a class as a function");
-  }
-  function _defineProperties(e, r) {
-    for (var t = 0; t < r.length; t++) {
-      var o = r[t];
-      o.enumerable = o.enumerable || !1, o.configurable = !0, "value" in o && (o.writable = !0), Object.defineProperty(e, _toPropertyKey(o.key), o);
-    }
-  }
-  function _createClass(e, r, t) {
-    return r && _defineProperties(e.prototype, r), t && _defineProperties(e, t), Object.defineProperty(e, "prototype", {
-      writable: !1
-    }), e;
-  }
-  function _iterableToArray(r) {
-    if ("undefined" != typeof Symbol && null != r[Symbol.iterator] || null != r["@@iterator"]) return Array.from(r);
-  }
-  function _iterableToArrayLimit(r, l) {
-    var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"];
-    if (null != t) {
-      var e,
-        n,
-        i,
-        u,
-        a = [],
-        f = !0,
-        o = !1;
-      try {
-        if (i = (t = t.call(r)).next, 0 === l) {
-          if (Object(t) !== t) return;
-          f = !1;
-        } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0);
-      } catch (r) {
-        o = !0, n = r;
-      } finally {
-        try {
-          if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return;
-        } finally {
-          if (o) throw n;
-        }
-      }
-      return a;
-    }
-  }
-  function _nonIterableRest() {
-    throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
-  }
-  function _nonIterableSpread() {
-    throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method.");
-  }
-  function _slicedToArray(r, e) {
-    return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest();
-  }
-  function _toConsumableArray(r) {
-    return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread();
-  }
-  function _toPrimitive(t, r) {
-    if ("object" != typeof t || !t) return t;
-    var e = t[Symbol.toPrimitive];
-    if (void 0 !== e) {
-      var i = e.call(t, r || "default");
-      if ("object" != typeof i) return i;
-      throw new TypeError("@@toPrimitive must return a primitive value.");
-    }
-    return ("string" === r ? String : Number)(t);
-  }
-  function _toPropertyKey(t) {
-    var i = _toPrimitive(t, "string");
-    return "symbol" == typeof i ? i : i + "";
-  }
-  function _typeof(o) {
-    "@babel/helpers - typeof";
+;(function (globalScope) {
+  "use strict";
 
-    return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) {
-      return typeof o;
-    } : function (o) {
-      return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o;
-    }, _typeof(o);
-  }
-  function _unsupportedIterableToArray(r, a) {
-    if (r) {
-      if ("string" == typeof r) return _arrayLikeToArray(r, a);
-      var t = {}.toString.call(r).slice(8, -1);
-      return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0;
-    }
-  }
+  var MetaNum = {
+    maxRows: 100,
+    maxCols: 100,
+    maxArrow: Number.MAX_SAFE_INTEGER,
+    serializeMode: 0,
+    debug: 0
+  },
 
-  /* Author: VeryrrDefine 0.2.16*/
-  //#endregion
-  //#region constants
-  var powiainaNumError = "[PowiainaNum 0.2 error]";
-  var MSI = 9007199254740991;
-  var MSI_LOG10 = 15.954589770191003;
-  var MSI_REC = 1.1102230246251568e-16;
-  var LONG_STRING_MIN_LENGTH = 17;
-  var EXP_E_REC = 1.444667861009766;
-  var isPowiainaNum = /^(PN)?[\/\-\+]*(Infinity|NaN|(P+|P\^\d+ )?(10(\^+|\{([1-9]\d*|!)(,([1-9]\d*|!))?(,[1-9]\d*)?\})|\(10(\^+|\{([1-9]\d*|!)(,([1-9]\d*|!))?(,[1-9]\d*)?\})\)\^[1-9]\d*\x20*)*((\d+(\.\d*)?|\d*\.\d+)?([Ee][-\+]*))*(0|\d+(\.\d*)?|\d*\.\d+))$/;
-  var BE_REGEX = /^((\d+(\.\d*)?|\d*\.\d+)?([EeFf]([-\+]?)))*(0|\d+(\.\d*)?|\d*\.\d+)$/;
-  //#endregion
-  //#region some useful functions
-  function newOperator(r) {
-    var a = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
-    var e = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
-    var m = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 1;
-    return {
-      repeat: r,
-      arrow: a,
-      expans: e,
-      megota: m,
-      valuereplaced: a == Infinity ? 0 : e == Infinity ? 1 : -1
-    };
-  }
-  function removeCommasOutsideBraces(input) {
-    var result = "";
-    var inBraces = false;
-    for (var i = 0; i < input.length; i++) {
-      var _char = input[i];
-      if (_char === "{") {
-        inBraces = true;
-        result += _char;
-      } else if (_char === "}") {
-        inBraces = false;
-        result += _char;
-      } else if (_char === ",") {
-        // 只有在花括号内部才保留逗号
-        if (inBraces) {
-          result += _char;
-        }
-        // 如果在花括号外部，就不添加到结果中（相当于删除）
-      } else {
-        result += _char;
-      }
-    }
-    return result;
-  }
-  function isIBreakEternity(obj) {
-    if (obj === null || _typeof(obj) !== "object") return false;
-    if (!("mag" in obj && typeof obj.mag == "number")) return false;
-    if (!("layer" in obj && typeof obj.layer == "number")) return false;
-    if (!("sign" in obj && typeof obj.sign == "number")) return false;
-    return true;
-  }
-  // parse 0.1.x PowiainaNum.js string
-  function parseLegacyPowiainaNumString(str) {
-    var pattern = /l(\d+)\s+s(\d+)\s+a(\[.*\])/;
-    var match = str.match(pattern);
-    try {
-      if (match) {
-        return {
-          lValue: parseInt(match[1]),
-          sValue: parseInt(match[2]),
-          array: JSON.parse(match[3])
-        };
-      }
-    } catch (_a) {
-      return null;
-    }
-    return null;
-  }
-  /**
-   * 如果左边小于右边的，返回-1,等于就是0，大于就是1
-   * @returns
-   */
-  function compareTuples() {
-    for (var _len = arguments.length, tuples = new Array(_len), _key = 0; _key < _len; _key++) {
-      tuples[_key] = arguments[_key];
-    }
-    for (var i = 0; i < Math.min(tuples[0].length, tuples[1].length); i++) {
-      var a = tuples[0][i];
-      var b = tuples[1][i];
-      if (a < b) return -1;
-      if (a > b) return 1;
+  external = true,
+
+  metaNumError = "[MetaNumError] ",
+  invalidArgument = metaNumError + "Invalid argument: ",
+
+  MAX_SAFE_INTEGER = 9007199254740991,
+  MAX_E = Math.log10(MAX_SAFE_INTEGER),
+
+  P = {},
+  Q = {},
+  R = {};
+
+  R.ZERO = 0;
+  R.ONE = 1;
+  R.NEGATIVE_ONE = -1;
+  R.TWO = 2;
+  R.TEN = 10;
+  R.E = Math.E;
+  R.LN2 = Math.LN2;
+  R.LN10 = Math.LN10;
+  R.LOG2E = Math.LOG2E;
+  R.LOG10E = Math.LOG10E;
+  R.PI = Math.PI;
+  R.SQRT1_2 = Math.SQRT1_2;
+  R.SQRT2 = Math.SQRT2;
+  R.MAX_SAFE_INTEGER = MAX_SAFE_INTEGER;
+  R.MIN_SAFE_INTEGER = Number.MIN_SAFE_INTEGER;
+  R.NaN = NaN;
+  R.POSITIVE_INFINITY = Infinity;
+  R.NEGATIVE_INFINITY = -Infinity;
+  R.E_MAX_SAFE_INTEGER = "E" + MAX_SAFE_INTEGER;
+  R.EE_MAX_SAFE_INTEGER = "EE" + MAX_SAFE_INTEGER;
+  R.TETRATED_MAX_SAFE_INTEGER = "F" + MAX_SAFE_INTEGER;
+  R.PENTATED_MAX_SAFE_INTEGER = "G" + MAX_SAFE_INTEGER;
+  R.TRITRI = "[[3638334640023.7783, 7625597484984]]";
+  R.GRAHAMS_NUMBER = "[[3638334640023.7783,7625597484984,0,1],[63,0,1]]";//对3↑↑↑↑3(≈GE^7625597484984 3638334640023.7783)做63次ω级运算
+  R.TERR3 = "[[10],[1,374389,2],[1,374387,2],[1,374385,2],[1,374383,2],[1,374381,2],[1,374379,2],[1,374377,2],[1,374375,2],[1,374373,2],[1,374371,2]]"; //注意是TERR而不是TREE，详见https://www.bilibili.com/video/BV1X94y1n7D1
+  R.QqQe308 = "QqQe308";
+
+  function cmpArr(a, b) {
+    var al = a.length;
+    while (al > 0 && a[al - 1] === 0) al--;
+    var bl = b.length;
+    while (bl > 0 && b[bl - 1] === 0) bl--;
+    if (al !== bl) return al > bl ? 1 : -1;
+    for (var i = al - 1; i >= 0; i--) {
+      if (a[i] > b[i]) return 1;
+      if (a[i] < b[i]) return -1;
     }
     return 0;
   }
-  function replaceETo10(str) {
-    // 使用正则表达式匹配 (e^数字) 的模式
-    // 正则解释：\(e\^(\d+)\) 匹配 (e^数字)，其中 \d+ 匹配一个或多个数字
-    return str.replace(/\(e\^(\d+)\)/g, "(10^)^$1 ").replace(/(\d+)[Pp][Tt]/g, "(10^)^$1 ");
-  }
-  /**
-   * 把一个字符串很长的数进行以10为底的对数
-   * @param str 被进行的字符串
-   * @returns 字符串以10为底的对数；
-   */
-  function log10LongString(str) {
-    return Math.log10(Number(str.substring(0, LONG_STRING_MIN_LENGTH))) + (str.length - LONG_STRING_MIN_LENGTH);
-  }
-  // Code from break_eternity.js
-  function f_gamma(n) {
-    if (!isFinite(n)) {
-      return n;
+
+  function isZeroArr(arr) {
+    if (!arr || arr.length === 0) return true;
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i] !== 0) return false;
     }
+    return true;
+  }
+
+  function deepCloneArray(arr) {
+    var result = [];
+    for (var i = 0; i < arr.length; i++) {
+      result[i] = arr[i].slice(0);
+    }
+    return result;
+  }
+
+  var debugMessageSent = false;
+
+  var f_gamma = function (n) {
+    if (!isFinite(n)) return n;
     if (n < -50) {
-      if (n === Math.trunc(n)) {
-        return Number.NEGATIVE_INFINITY;
-      }
+      if (n == Math.trunc(n)) return Number.NEGATIVE_INFINITY;
       return 0;
     }
     var scal1 = 1;
@@ -220,3827 +95,4923 @@
       ++n;
     }
     n -= 1;
-    var l = 0.9189385332046727; //0.5*Math.log(2*Math.PI)
-    l = l + (n + 0.5) * Math.log(n);
-    l = l - n;
+    var l = 0.9189385332046727;
+    l += (n + 0.5) * Math.log(n);
+    l -= n;
     var n2 = n * n;
     var np = n;
-    l = l + 1 / (12 * np);
-    np = np * n2;
-    l = l - 1 / (360 * np);
-    np = np * n2;
-    l = l + 1 / (1260 * np);
-    np = np * n2;
-    l = l - 1 / (1680 * np);
-    np = np * n2;
-    l = l + 1 / (1188 * np);
-    np = np * n2;
-    l = l - 691 / (360360 * np);
-    np = np * n2;
-    l = l + 7 / (1092 * np);
-    np = np * n2;
-    l = l - 3617 / (122400 * np);
+    l += 1 / (12 * np);
+    np *= n2;
+    l -= 1 / (360 * np);
+    np *= n2;
+    l += 1 / (1260 * np);
+    np *= n2;
+    l -= 1 / (1680 * np);
+    np *= n2;
+    l += 1 / (1188 * np);
+    np *= n2;
+    l -= 691 / (360360 * np);
+    np *= n2;
+    l += 7 / (1092 * np);
+    np *= n2;
+    l -= 3617 / (122400 * np);
     return Math.exp(l) / scal1;
-  }
-  var OMEGA = 0.56714329040978387299997; // W(1, 0)
-  //from https://math.stackexchange.com/a/465183
-  // The evaluation can become inaccurate very close to the branch point
-  // Evaluates W(x, 0) if principal is true, W(x, -1) if principal is false
-  function f_lambertw(z) {
-    var t = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1e-10;
-    var pr = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : true;
-    var tol = t;
-    var principal = pr;
-    var w;
-    var wn;
-    if (!Number.isFinite(z)) {
-      return z;
+  };
+
+  var f_logGamma = function (n) {
+    if (!isFinite(n) || n <= 0) return NaN;
+    var scalLog = 0;
+    while (n < 10) {
+      scalLog += Math.log(n);
+      ++n;
     }
+    n -= 1;
+    var l = 0.9189385332046727;
+    l += (n + 0.5) * Math.log(n);
+    l -= n;
+    var n2 = n * n;
+    var np = n;
+    l += 1 / (12 * np);
+    np *= n2;
+    l -= 1 / (360 * np);
+    np *= n2;
+    l += 1 / (1260 * np);
+    np *= n2;
+    l -= 1 / (1680 * np);
+    np *= n2;
+    l += 1 / (1188 * np);
+    np *= n2;
+    l -= 691 / (360360 * np);
+    np *= n2;
+    l += 7 / (1092 * np);
+    np *= n2;
+    l -= 3617 / (122400 * np);
+    return (l - scalLog) / Math.LN10;
+  };
+
+  var OMEGA = 0.56714329040978387299997;
+
+  var f_lambertw = function (z, tol, principal) {
+    if (tol === undefined) tol = 1e-10;
+    if (principal === undefined) principal = true;
+    var w;
+    if (!Number.isFinite(z)) return z;
     if (principal) {
-      if (z === 0) {
-        return z;
-      }
-      if (z === 1) {
-        return OMEGA;
-      }
-      if (z < 10) {
-        w = 0;
-      } else {
-        w = Math.log(z) - Math.log(Math.log(z));
-      }
+      if (z === 0) return z;
+      if (z === 1) return OMEGA;
+      if (z < 10) w = 0;
+      else w = Math.log(z) - Math.log(Math.log(z));
     } else {
       if (z === 0) return -Infinity;
-      if (z <= -0.1) {
-        w = -2;
-      } else {
-        w = Math.log(-z) - Math.log(-Math.log(-z));
-      }
+      if (z <= -0.1) w = -2;
+      else w = Math.log(-z) - Math.log(-Math.log(-z));
     }
     for (var i = 0; i < 100; ++i) {
-      wn = (z * Math.exp(-w) + w * w) / (w + 1);
-      if (Math.abs(wn - w) < tol * Math.abs(wn)) {
-        return wn;
-      } else {
-        w = wn;
-      }
+      var wn = (z * Math.exp(-w) + w * w) / (w + 1);
+      if (Math.abs(wn - w) < tol * Math.abs(wn)) return wn;
+      w = wn;
     }
-    throw Error("Iteration failed to converge: ".concat(z.toString())); //return Number.NaN;
-  }
-  function isTwoLengthArray(x) {
-    return x.length == 2;
-  }
-  function isTwoNumberArray(x) {
-    return typeof x[0] === "number" && typeof x[1] === "number";
-  }
-  function isExpantaNumArray(x) {
-    if (!Array.isArray(x)) return false;
-    for (var i = 0; i < x.length; i++) {
-      var arr = x[i];
-      if (!Array.isArray(arr)) return false;
-      if (!isTwoLengthArray(arr)) return false;
-      if (!isTwoNumberArray(arr)) return false;
-    }
-    return true;
-  }
-  function replaceXToInfinity(x) {
-    if (x === "x") return Infinity;
-    return x;
-  }
-  function isFourLengthArray(x) {
-    return x.length == 4;
-  }
-  function isFourNumberArray(x) {
-    if (typeof x[0] == "number" && typeof x[1] == "number" && typeof x[2] == "number" && typeof x[3] == "number") {
-      return true;
-    }
-    return false;
-  }
-  function isFourArrayWithFirstTermX(x) {
-    if (x[0] === "x" && typeof x[1] == "number" && typeof x[2] == "number" && typeof x[3] == "number") {
-      return true;
-    }
-    return false;
-  }
-  function isFourArrayWithThirdTermX(x) {
-    if (typeof x[0] == "number" && typeof x[1] == "number" && x[2] == "x" && typeof x[3] == "number") {
-      return true;
-    }
-    return false;
-  }
-  function isPowiainaNum01XArray(x) {
-    if (!Array.isArray(x)) return false;
-    if (typeof x[0] != "number") return false;
-    for (var i = 1; i < x.length; i++) {
-      var b = x[i];
-      if (!Array.isArray(b)) return false;
-      if (!isFourLengthArray(b)) return false;
-      if (!isFourNumberArray(b) && !isFourArrayWithFirstTermX(b) && !isFourArrayWithThirdTermX(b)) return false;
-    }
-    return true;
-  }
-  function countLeadingZerosAfterDecimal(numStr) {
-    var match = numStr.match(/^0\.(0*)[1-9]/);
-    return match ? match[1].length : 0;
-  }
-  /*
-  function countLeadingZerosAfterDecimal(numStr) {
-      const match = numStr.match(/^0\.(0*)[1-9]/);
-      return match ? match[1].length : 0;
-  }
-  */
-  //from https://github.com/scipy/scipy/blob/8dba340293fe20e62e173bdf2c10ae208286692f/scipy/special/lambertw.pxd
-  // The evaluation can become inaccurate very close to the branch point
-  // at ``-1/e``. In some corner cases, `lambertw` might currently
-  // fail to converge, or can end up on the wrong branch.
-  // Evaluates W(x, 0) if principal is true, W(x, -1) if principal is false
-  function d_lambertw(z) {
-    var tol = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1e10;
-    var principal = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : true;
-    z = new PowiainaNum(z);
+    throw Error("Iteration failed to converge: " + z);
+  };
+
+  var d_lambertw = function (z, tol, principal) {
+    if (tol === undefined) tol = 1e-10;
+    if (principal === undefined) principal = true;
+    z = new MetaNum(z);
     var w;
     if (!z.isFinite()) return z;
     if (principal) {
-      if (z.eq(PowiainaNum.ZERO)) return z;
-      if (z.eq(PowiainaNum.ONE)) return new PowiainaNum(OMEGA);
-      w = PowiainaNum.log(z);
+      if (z.eq(MetaNum.ZERO)) return z;
+      if (z.eq(MetaNum.ONE)) return new MetaNum(OMEGA);
+      w = MetaNum.ln(z);
     } else {
-      if (z.eq(PowiainaNum.ZERO)) return PowiainaNum.NEGATIVE_INFINITY;
-      w = PowiainaNum.log(z.neg());
+      if (z.eq(MetaNum.ZERO)) return MetaNum.NEGATIVE_INFINITY.clone();
+      w = MetaNum.ln(z.neg());
     }
     for (var i = 0; i < 100; ++i) {
       var ew = w.neg().exp();
       var wewz = w.sub(z.mul(ew));
-      var dd = w.add(PowiainaNum.ONE).sub(w.add(2).mul(wewz).div(PowiainaNum.mul(2, w).add(2)));
-      if (dd.eq(PowiainaNum.ZERO)) return w;
+      var dd = w.add(MetaNum.ONE).sub(w.add(2).mul(wewz).div(MetaNum.mul(2, w).add(2)));
+      if (dd.eq(MetaNum.ZERO)) return w;
       var wn = w.sub(wewz.div(dd));
-      if (PowiainaNum.abs(wn.sub(w)).lt(PowiainaNum.abs(wn).mul(tol))) return wn;
+      if (MetaNum.abs(wn.sub(w)).lt(MetaNum.abs(wn).mul(tol))) return wn;
       w = wn;
     }
     throw Error("Iteration failed to converge: " + z);
-  }
-  function arraySortFunction(a, b) {
-    return compareTuples([a.megota, a.expans, a.arrow], [b.megota, b.expans, b.arrow]);
-  }
-  /**
-   * Merge arrays in arrow,expans,megota is all same.
-   * @param x an object has `array` key.
-   */
-  function mergeSameArrays(x) {
-    for (var i = 1; i < x.array.length - 1; ++i) {
-      var q = x.array[i];
-      var r = x.array[i + 1];
-      if (q.arrow == r.arrow && q.expans == r.expans && q.megota == r.megota) {
-        // same array's merge
-        q.repeat += r.repeat;
-        x.array.splice(i + 1, 1);
-        --i;
-      }
-    }
-  }
-  function arrFracParaInv(x, y, res2) {
-    var res = new PowiainaNum(x).pow(new PowiainaNum(res2).sub(y).add(1)).mul(new PowiainaNum(2).pow(new PowiainaNum(y).sub(res2)));
-    return res;
-  }
-  function arrFracPara(x, y, z) {
-    var lg2 = new PowiainaNum(2).logBase(x);
-    return new PowiainaNum(y).sub(1).add(new PowiainaNum(z).logBase(x).sub(lg2).div(new PowiainaNum(1).sub(lg2)));
-  }
-  function arrowpsdInv(base, height, res4) {
-    var x = new PowiainaNum(base);
-    var y = new PowiainaNum(height);
-    var z = new PowiainaNum(res4);
-    var res = arrFracParaInv(x, y, new PowiainaNum(z).omegalog(x.toNumber()));
-    if (z.gt(x)) {
-      var add2handled = arrowpsdInv(x, y.add(1), z);
-      var handled = add2handled.sub(2);
-      var bottom = arrowpsdInv(x, y, x);
-      var top = x;
-      var anylog2 = handled.pow_base(top.div(bottom)).mul(bottom);
-      return arrowpsd(x, y, anylog2);
-    }
-    return res;
-  }
-  function arrowpsd(base, height, other) {
-    var x = new PowiainaNum(base);
-    var y = new PowiainaNum(height);
-    var z = new PowiainaNum(other);
-    if (y.isInt()) return PowiainaNum.arrow(x, y, z);
-    if (z.gt(x)) {
-      var anylog2 = arrowpsdInv(x, y, z);
-      var bottom = arrowpsdInv(x, y, x);
-      var top = x;
-      var handled = anylog2.div(bottom).logBase(top.div(bottom));
-      return arrowpsd(x, y.add(1), PowiainaNum.add(2, handled));
-    }
-    return PowiainaNum.arrFrac(x, arrFracPara(x, y, z));
-  }
-  function log10PosBigInt(input) {
+  };
+
+  var decimalPlaces = function (value, places) {
+    var len = places + 1;
+    var numDigits = Math.ceil(Math.log10(Math.abs(value)));
+    if (numDigits < 100) numDigits = 0;
+    var rounded = Math.round(value * Math.pow(10, len - numDigits)) * Math.pow(10, numDigits - len);
+    return parseFloat(rounded.toFixed(Math.max(len - numDigits, 0)));
+  };
+
+  var log10PosBigInt = function (input) {
     var exp = BigInt(64);
     while (input >= BigInt(1) << exp) exp *= BigInt(2);
     var expdel = exp / BigInt(2);
     while (expdel > BigInt(0)) {
-      if (input >= BigInt(1) << exp) exp += expdel;else exp -= expdel;
+      if (input >= BigInt(1) << exp) exp += expdel;
+      else exp -= expdel;
       expdel /= BigInt(2);
     }
     var cutbits = exp - BigInt(54);
     var firstbits = input >> cutbits;
     return Math.log10(Number(firstbits)) + Math.LOG10E / Math.LOG2E * Number(cutbits);
-  }
-  //#endregion
-  var arrays = {
-    ZERO: [{
-      arrow: 0,
-      expans: 1,
-      megota: 1,
-      repeat: Infinity
-    }],
-    NaN: [{
-      arrow: 0,
-      expans: 1,
-      megota: 1,
-      repeat: NaN
-    }]
   };
-  var PowiainaNum = /*#__PURE__*/function () {
-    /**
-     * Constructor of PowiainaNum class,
-     * If no arguments, return `PowiainaNum.NaN`.
-     */
-    function PowiainaNum(arg1) {
-      _classCallCheck(this, PowiainaNum);
-      this.array = arrays.NaN;
-      this.small = false;
-      this.sign = 0;
-      this.layer = 0;
-      if (PowiainaNum.blankArgumentConstructorReturnZero) {
-        this.array = arrays.ZERO;
-        this.small = true;
+
+  var LONG_STRING_MIN_LENGTH = 17;
+
+  var log10LongString = function (str) {
+    return Math.log10(Number(str.substring(0, LONG_STRING_MIN_LENGTH))) + (str.length - LONG_STRING_MIN_LENGTH);
+  };
+
+  P.normalize = function () {
+    var b;
+    var x = this;
+
+    if (!x.array || !Array.isArray(x.array) || x.array.length === 0) {
+      x.array = [[0]];
+    }
+    if (x.sign !== 1 && x.sign !== -1 && x.sign !== 2 && x.sign !== -2) {
+      // For invalid signs, try to interpret: negative → -1, positive → 1
+      var s = Number(x.sign);
+      if (isNaN(s)) s = 1;
+      x.sign = s < 0 ? -1 : 1;
+    }
+    if (typeof x.layer !== 'number' || !isFinite(x.layer) || x.layer < 0) {
+      x.layer = 0;
+    }
+    x.layer = Math.floor(x.layer);
+
+    for (var i = 0; i < x.array.length; i++) {
+      if (!Array.isArray(x.array[i])) {
+        x.array[i] = [x.array[i]];
       }
-      if (arg1 !== undefined) {
-        try {
-          if (typeof arg1 == "undefined") {} else if (typeof arg1 == "number") {
-            var obj = PowiainaNum.fromNumber(arg1);
-            this.resetFromObject(obj);
-          } else if (typeof arg1 == "string") {
-            var _obj = PowiainaNum.fromString(arg1);
-            this.resetFromObject(_obj);
-          } else if (_typeof(arg1) == "object") {
-            var _obj2 = PowiainaNum.fromObject(arg1);
-            this.resetFromObject(_obj2);
-          } else if (typeof arg1 == "bigint") {
-            var _obj3 = PowiainaNum.fromBigInt(arg1);
-            this.resetFromObject(_obj3);
-          } else {
-            var isn = arg1;
+    }
+
+    if (x.array[0] && x.array[0].length > 0) {
+      if (isNaN(x.array[0][0])) {
+        x.array = [[NaN]];
+        x.sign = 1;
+        x.layer = 0;
+        return x;
+      }
+      if (!isFinite(x.array[0][0])) {
+        x.array = [[x.array[0][0] === Infinity ? Infinity : -Infinity]];
+        x.sign = 1;
+        x.layer = 0;
+        return x;
+      }
+    }
+
+    var r0 = x.array[0];
+    for (var i = 0; i < r0.length; i++) {
+      if (r0[i] === null || r0[i] === undefined) {
+        r0[i] = 0;
+        continue;
+      }
+      if (i !== 0 && !Number.isInteger(r0[i])) r0[i] = Math.floor(r0[i]);
+    }
+
+    var small = isSmall(x);
+
+    do {
+      b = false;
+
+      while (r0.length > 1 && r0[r0.length - 1] === 0) {
+        r0.pop();
+        b = true;
+      }
+
+      // Normalize r0[0] only for non-small values
+      if (!small && x.layer === 0 && r0[0] > MAX_SAFE_INTEGER) {
+        r0[1] = (r0[1] || 0) + 1;
+        r0[0] = Math.log10(r0[0]);
+        b = true;
+      }
+
+      while (!small && x.layer === 0 && r0.length > 1 && r0[0] < MAX_E && r0[1]) {
+        r0[0] = Math.pow(10, r0[0]);
+        r0[1]--;
+        b = true;
+      }
+
+      for (var i = 1; i < r0.length; i++) {
+        if (!small && r0[i] > MAX_SAFE_INTEGER) {
+          r0[i + 1] = (r0[i + 1] || 0) + 1;
+          r0[0] = r0[i] + 1;
+          for (var j = 1; j <= i; j++) r0[j] = 0;
+          b = true;
+        }
+      }
+
+      while (x.array.length > 1 && isZeroArr(x.array[x.array.length - 1])) {
+        x.array.pop();
+        b = true;
+      }
+
+      if (x.array.length > MetaNum.maxRows) {
+        x.array = x.array.slice(0, MetaNum.maxRows);
+        b = true;
+      }
+
+      for (var i = 0; i < x.array.length; i++) {
+        if (x.array[i].length > MetaNum.maxCols) {
+          x.array[i] = x.array[i].slice(0, MetaNum.maxCols);
+          b = true;
+        }
+      }
+
+      if (x.array.length === 0) {
+        x.array = [[0]];
+        b = true;
+      }
+
+      for (var i = 0; i < x.array.length; i++) {
+        for (var j = 0; j < x.array[i].length; j++) {
+          if (x.array[i][j] === null || x.array[i][j] === undefined) {
+            x.array[i][j] = 0;
+            b = true;
           }
-        } catch (e) {
-          console.error("Malformed input");
-          console.error(e);
-          if (PowiainaNum.throwErrorOnResultNaN && PowiainaNum.isNaN(this)) throw new Error("NaN");
+          if ((i > 0 || j > 0) && (!isFinite(x.array[i][j]) || isNaN(x.array[i][j]))) {
+            x.array[i][j] = 0;
+            b = true;
+          }
+        }
+      }
+
+      for (var i = 1; i < x.array.length; i++) {
+        var row = x.array[i];
+        while (row.length > 0 && row[row.length - 1] === 0) {
+          row.pop();
+          b = true;
+        }
+      }
+
+      if (x.array.length > 2) {
+        var rows2plus = x.array.slice(1);
+        rows2plus.sort(function (a, b) { return cmpArr(a, b); });
+        var orderChanged = false;
+        for (var i = 0; i < rows2plus.length; i++) {
+          if (cmpArr(rows2plus[i], x.array[i + 1]) !== 0) {
+            orderChanged = true;
+            break;
+          }
+        }
+        if (orderChanged) {
+          for (var i = 0; i < rows2plus.length; i++) {
+            x.array[i + 1] = rows2plus[i].slice(0);
+          }
+          b = true;
+        }
+      }
+
+      for (var i = x.array.length - 1; i > 1; i--) {
+        var rowA = x.array[i];
+        var rowB = x.array[i - 1];
+        if (rowA.length === rowB.length && rowA.length >= 2) {
+          var same = true;
+          for (var k = 1; k < rowA.length; k++) {
+            if (rowA[k] !== rowB[k]) { same = false; break; }
+          }
+          if (same) {
+            rowB[0] += rowA[0];
+            x.array.splice(i, 1);
+            b = true;
+          }
+        }
+      }
+
+    } while (b);
+
+    if (!x.array.length || !x.array[0]) {
+      x.array = [[0]];
+      x.sign = isSmall(x) ? 2 : 1;
+    }
+
+    // Normalize zero sign: 0 is always positive
+    if (x.array.length === 1 && x.array[0].length === 1 && x.array[0][0] === 0 && (x.sign === -1 || x.sign === -2)) {
+      x.sign = x.sign === -2 ? 2 : 1;
+    }
+
+    // Layer is managed explicitly by layerUp/layerDown, not computed from array.
+    // Do not recompute layer here - preserve the value set by the caller/parser.
+
+    return x;
+  };
+
+  var standardizeMessageSent = false;
+  P.standardize = function () {
+    if (!standardizeMessageSent) console.warn(metaNumError + "'standardize' method is being deprecated in favor of 'normalize' and will be removed in the future!"), standardizeMessageSent = true;
+    return this.normalize();
+  };
+
+  P.absoluteValue = P.abs = function () {
+    var x = this.clone();
+    // sign=1→1, sign=-1→1, sign=2→2, sign=-2→2
+    x.sign = x.sign === 2 || x.sign === -2 ? 2 : 1;
+    return x;
+  };
+  Q.absoluteValue = Q.abs = function (x) {
+    return new MetaNum(x).abs();
+  };
+
+  P.negate = P.neg = function () {
+    var x = this.clone();
+    // 1↔-1, 2↔-2
+    x.sign = x.sign === 1 ? -1 : x.sign === -1 ? 1 : x.sign === 2 ? -2 : 2;
+    return x.normalize();
+  };
+  Q.negate = Q.neg = function (x) {
+    return new MetaNum(x).neg();
+  };
+
+  P.compareTo = P.cmp = function (other) {
+    if (!(other instanceof MetaNum)) other = new MetaNum(other);
+
+    if (this.array[0] && isNaN(this.array[0][0])) return NaN;
+    if (other.array[0] && isNaN(other.array[0][0])) return NaN;
+
+    var tInf = this.array[0] && this.array[0][0] === Infinity;
+    var oInf = other.array[0] && other.array[0][0] === Infinity;
+
+    if (tInf && !oInf) return this.sign;
+    if (!tInf && oInf) return -other.sign;
+    if (tInf && oInf) {
+      if (this.sign !== other.sign) return this.sign;
+      return 0;
+    }
+
+    var tAllZero = (this.array.length === 1 && this.array[0].length === 1 && this.array[0][0] === 0);
+    var oAllZero = (other.array.length === 1 && other.array[0].length === 1 && other.array[0][0] === 0);
+    if (tAllZero && oAllZero) return 0;
+
+    // Small value comparison (similar to PowiainaNum)
+    var tSmall = isSmall(this);
+    var oSmall = isSmall(other);
+    var tNormSign = toNormalizedSign(this.sign);
+    var oNormSign = toNormalizedSign(other.sign);
+
+    if (tNormSign !== oNormSign) return tNormSign;
+
+    // If one is small and the other is not
+    // Special case: if the non-small value is zero, the small value's sign determines the result
+    if (tSmall && !oSmall) {
+      if (oAllZero) return tNormSign; // small positive > 0, small negative < 0
+      return tNormSign === 1 ? -1 : 1;
+    }
+    if (oSmall && !tSmall) {
+      if (tAllZero) return -oNormSign; // 0 < small positive, 0 > small negative
+      return tNormSign === 1 ? 1 : -1;
+    }
+
+    var m = tNormSign;
+    // If both are small, reverse comparison
+    if (tSmall && oSmall) m = -m;
+
+    if (this.layer !== other.layer) {
+      return (this.layer > other.layer ? 1 : -1) * m;
+    }
+
+    var tRows = this.array.length;
+    var oRows = other.array.length;
+    while (tRows > 1 && isZeroArr(this.array[tRows - 1])) tRows--;
+    while (oRows > 1 && isZeroArr(other.array[oRows - 1])) oRows--;
+
+    if (tRows !== oRows) return (tRows > oRows ? 1 : -1) * m;
+
+    for (var i = tRows - 1; i >= 0; i--) {
+      var c = cmpArr(this.array[i], other.array[i]);
+      if (c !== 0) return c * m;
+    }
+
+    return 0;
+  };
+  Q.compare = Q.cmp = function (x, y) {
+    return new MetaNum(x).cmp(y);
+  };
+
+  P.greaterThan = P.gt = function (other) {
+    return this.cmp(other) > 0;
+  };
+  Q.greaterThan = Q.gt = function (x, y) {
+    return new MetaNum(x).gt(y);
+  };
+
+  P.greaterThanOrEqualTo = P.gte = function (other) {
+    return this.cmp(other) >= 0;
+  };
+  Q.greaterThanOrEqualTo = Q.gte = function (x, y) {
+    return new MetaNum(x).gte(y);
+  };
+
+  P.lessThan = P.lt = function (other) {
+    return this.cmp(other) < 0;
+  };
+  Q.lessThan = Q.lt = function (x, y) {
+    return new MetaNum(x).lt(y);
+  };
+
+  P.lessThanOrEqualTo = P.lte = function (other) {
+    return this.cmp(other) <= 0;
+  };
+  Q.lessThanOrEqualTo = Q.lte = function (x, y) {
+    return new MetaNum(x).lte(y);
+  };
+
+  P.equalsTo = P.equal = P.eq = function (other) {
+    return this.cmp(other) === 0;
+  };
+  Q.equalsTo = Q.equal = Q.eq = function (x, y) {
+    return new MetaNum(x).eq(y);
+  };
+
+  P.notEqualsTo = P.notEqual = P.neq = function (other) {
+    return this.cmp(other) !== 0;
+  };
+  Q.notEqualsTo = Q.notEqual = Q.neq = function (x, y) {
+    return new MetaNum(x).neq(y);
+  };
+
+  P.minimum = P.min = function (other) {
+    return this.lt(other) ? this.clone() : new MetaNum(other);
+  };
+  Q.minimum = Q.min = function (x, y) {
+    return new MetaNum(x).min(y);
+  };
+
+  P.maximum = P.max = function (other) {
+    return this.gt(other) ? this.clone() : new MetaNum(other);
+  };
+  Q.maximum = Q.max = function (x, y) {
+    return new MetaNum(x).max(y);
+  };
+
+  P.compareTo_tolerance = P.cmp_tolerance = function (other, tolerance) {
+    if (!(other instanceof MetaNum)) other = new MetaNum(other);
+    return this.eq_tolerance(other, tolerance) ? 0 : this.cmp(other);
+  };
+  Q.compare_tolerance = Q.cmp_tolerance = function (x, y, tolerance) {
+    return new MetaNum(x).cmp_tolerance(y, tolerance);
+  };
+
+  P.greaterThan_tolerance = P.gt_tolerance = function (other, tolerance) {
+    if (!(other instanceof MetaNum)) other = new MetaNum(other);
+    return !this.eq_tolerance(other, tolerance) && this.gt(other);
+  };
+  Q.greaterThan_tolerance = Q.gt_tolerance = function (x, y, tolerance) {
+    return new MetaNum(x).gt_tolerance(y, tolerance);
+  };
+
+  P.greaterThanOrEqualTo_tolerance = P.gte_tolerance = function (other, tolerance) {
+    if (!(other instanceof MetaNum)) other = new MetaNum(other);
+    return this.eq_tolerance(other, tolerance) || this.gt(other);
+  };
+  Q.greaterThanOrEqualTo_tolerance = Q.gte_tolerance = function (x, y, tolerance) {
+    return new MetaNum(x).gte_tolerance(y, tolerance);
+  };
+
+  P.lessThan_tolerance = P.lt_tolerance = function (other, tolerance) {
+    if (!(other instanceof MetaNum)) other = new MetaNum(other);
+    return !this.eq_tolerance(other, tolerance) && this.lt(other);
+  };
+  Q.lessThan_tolerance = Q.lt_tolerance = function (x, y, tolerance) {
+    return new MetaNum(x).lt_tolerance(y, tolerance);
+  };
+
+  P.lessThanOrEqualTo_tolerance = P.lte_tolerance = function (other, tolerance) {
+    if (!(other instanceof MetaNum)) other = new MetaNum(other);
+    return this.eq_tolerance(other, tolerance) || this.lt(other);
+  };
+  Q.lessThanOrEqualTo_tolerance = Q.lte_tolerance = function (x, y, tolerance) {
+    return new MetaNum(x).lte_tolerance(y, tolerance);
+  };
+
+  P.equalsTo_tolerance = P.equal_tolerance = P.eq_tolerance = function (other, tolerance) {
+    if (!(other instanceof MetaNum)) other = new MetaNum(other);
+    if (tolerance == null) tolerance = 1e-7;
+    if (this.isNaN() || other.isNaN() || this.isFinite() != other.isFinite()) return false;
+    if (toNormalizedSign(this.sign) !== toNormalizedSign(other.sign)) return false;
+    if (this.layer !== other.layer) return false;
+    var a, b, tR = this.array.length, oR = other.array.length;
+    if (tR <= 1 && oR <= 1) {
+      a = this.array[0] ? this.array[0][0] || 0 : 0;
+      b = other.array[0] ? other.array[0][0] || 0 : 0;
+      return Math.abs(a - b) <= tolerance * Math.max(Math.abs(a), Math.abs(b));
+    }
+    if (Math.abs(tR - oR) > 1) return false;
+    for (var i = Math.max(tR, oR) - 1; i >= 0; i--) {
+      var tRow = this.array[i] || [0];
+      var oRow = other.array[i] || [0];
+      if (cmpArr(tRow, oRow) !== 0) return false;
+    }
+    return true;
+  };
+  Q.equalsTo_tolerance = Q.equal_tolerance = Q.eq_tolerance = function (x, y, tolerance) {
+    return new MetaNum(x).eq_tolerance(y, tolerance);
+  };
+
+  P.notEqualsTo_tolerance = P.notEqual_tolerance = P.neq_tolerance = function (other, tolerance) {
+    return !this.eq_tolerance(other, tolerance);
+  };
+  Q.notEqualsTo_tolerance = Q.notEqual_tolerance = Q.neq_tolerance = function (x, y, tolerance) {
+    return new MetaNum(x).neq_tolerance(y, tolerance);
+  };
+
+  P.isPositive = P.ispos = function () {
+    return this.gt(MetaNum.ZERO);
+  };
+  Q.isPositive = Q.ispos = function (x) {
+    return new MetaNum(x).ispos();
+  };
+
+  P.isNegative = P.isneg = function () {
+    return this.lt(MetaNum.ZERO);
+  };
+  Q.isNegative = Q.isneg = function (x) {
+    return new MetaNum(x).isneg();
+  };
+
+  P.isNaN = function () {
+    return this.array[0] && isNaN(this.array[0][0]);
+  };
+  Q.isNaN = function (x) {
+    return new MetaNum(x).isNaN();
+  };
+
+  P.isFinite = function () {
+    if (!this.array[0]) return true;
+    return isFinite(this.array[0][0]);
+  };
+  Q.isFinite = function (x) {
+    return new MetaNum(x).isFinite();
+  };
+
+  P.isInfinite = function () {
+    return this.array[0] && this.array[0][0] === Infinity;
+  };
+  Q.isInfinite = function (x) {
+    return new MetaNum(x).isInfinite();
+  };
+
+  P.layerUp = function () {
+    var x = this.clone();
+    if (x.isNaN()) return x;
+
+    var actualRows = x.array.length;
+    while (actualRows > 1 && isZeroArr(x.array[actualRows - 1])) actualRows--;
+
+    if (actualRows <= 1) return x;
+
+    var maxRow = x.array[actualRows - 1];
+    x.array[0] = maxRow.slice(0);
+    x.array = [x.array[0]];
+    var savedLayer = x.layer + 1;
+    x.layer = savedLayer;
+    x.normalize();
+    x.layer = savedLayer;
+    return x;
+  };
+  Q.layerUp = function (x) {
+    return new MetaNum(x).layerUp();
+  };
+
+  P.layerDown = function () {
+    var x = this.clone();
+    if (x.isNaN() || x.layer <= 0) return x;
+
+    var hasRowsAfter = false;
+    for (var i = 1; i < x.array.length; i++) {
+      if (!isZeroArr(x.array[i])) {
+        hasRowsAfter = true;
+        break;
+      }
+    }
+
+    if (hasRowsAfter) return x;
+
+    if (x.array.length < 2) x.array.push([0]);
+    x.array[1] = x.array[0].slice(0);
+    x.array[0] = [0];
+    var savedLayer = x.layer - 1;
+    x.layer = savedLayer;
+    x.normalize();
+    x.layer = savedLayer;
+    return x;
+  };
+  Q.layerDown = function (x) {
+    return new MetaNum(x).layerDown();
+  };
+
+  function isSimple(x) {
+    return x.layer === 0 && x.array.length === 1 &&
+           x.array[0].length === 1 && isFinite(x.array[0][0]) &&
+           Math.abs(x.array[0][0]) <= MAX_SAFE_INTEGER;
+  }
+
+  function isSmall(x) {
+    return x.sign === 2 || x.sign === -2;
+  }
+
+  function computeLayer(arr) {
+    // Layer represents ω^ nesting level above the ordinal represented by the array.
+    // For all normal ordinal operations (up to ω^(maxcols-1) level), layer is 0.
+    // Layer 1 = ω^(array ordinal), layer 2 = ω^ω^(array ordinal), etc.
+    // Layer is managed explicitly by layerUp/layerDown, not computed from array.
+    return 0;
+  }
+
+  function toNormalizedSign(s) {
+    // Map sign=2/-2 to the corresponding normal sign for the array data
+    return s === 2 ? 1 : s === -2 ? -1 : s;
+  }
+
+  function hyperLevel(n, val) {
+    var arr = new Array(n + 1);
+    for (var i = 0; i <= n; i++) arr[i] = 0;
+    arr[0] = val;
+    arr[n] = 1;
+    return new MetaNum([arr]);
+  }
+
+  function hyperLevelSafe(n, val) {
+    var arr = new Array(n + 1);
+    for (var i = 0; i <= n; i++) arr[i] = 0;
+    arr[0] = val;
+    arr[n] = 1;
+    var oldMaxCols = MetaNum.maxCols;
+    MetaNum.maxCols = Math.max(oldMaxCols, n + 1);
+    var r = new MetaNum([arr]);
+    MetaNum.maxCols = oldMaxCols;
+    return r;
+  }
+
+  function addOrdinalRow(metaNum, count, rawLevel) {
+    // Add an ordinal row [count, raw_level] to the MetaNum
+    // If there's already an ordinal row with the same level, merge counts
+    var x = metaNum.clone();
+    if (typeof rawLevel !== 'number' || !isFinite(rawLevel) || rawLevel < 0) {
+      return x;
+    }
+    if (count <= 0) return x;
+    // Try to merge with existing row at the same level
+    for (var i = 1; i < x.array.length; i++) {
+      var row = x.array[i];
+      if (row.length === 2 && row[1] === rawLevel) {
+        row[0] += count;
+        return x;
+      }
+    }
+    if (x.array.length < MetaNum.maxRows) {
+      x.array.push([count, rawLevel]);
+    }
+    return x;
+  }
+
+  P.plus = P.add = function (other) {
+    var x = this.clone();
+    other = new MetaNum(other);
+
+    if (x.sign === -1) return x.neg().add(other.neg()).neg();
+    if (x.sign === -2) return x.neg().add(other.neg()).neg();
+    if (other.sign === -1) return x.sub(other.neg());
+    if (other.sign === -2) return x.sub(other.neg());
+    if (x.eq(MetaNum.ZERO)) return other;
+    if (other.eq(MetaNum.ZERO)) return x;
+    if (x.isNaN() || other.isNaN()) return MetaNum.NaN.clone();
+    if (x.isInfinite() && other.isInfinite() && x.eq(other.neg())) return MetaNum.NaN.clone();
+    if (x.isInfinite()) return x;
+    if (other.isInfinite()) return other;
+
+    // For simple numbers, use direct numeric addition
+    if (isSimple(x) && isSimple(other)) {
+      var directSum = x.toNumber() + other.toNumber();
+      if (isFinite(directSum)) return new MetaNum(directSum);
+    }
+
+    var xIsSmall = isSmall(x);
+    var oIsSmall = isSmall(other);
+
+    var p = x.min(other);
+    var q = x.max(other);
+    var t;
+
+    // If one is normal huge and other is small: huge dominates
+    if (xIsSmall !== oIsSmall) {
+      // One is small, one is normal → the normal (non-small) dominates
+      return oIsSmall ? x.clone() : other.clone();
+    }
+
+    if (xIsSmall && oIsSmall) {
+      // Both small: add as reciprocals, then reciprocalize result
+      var xInv = x.clone(); xInv.sign = 1; // small positive → large positive
+      var oInv = other.clone(); oInv.sign = 1;
+      var sumInv = xInv.add(oInv);
+      var result = sumInv.rec();
+      return result;
+    }
+
+    // Normal (non-small) addition
+    if (q.gt(MetaNum.E_MAX_SAFE_INTEGER) || q.div(p).gt(MetaNum.MAX_SAFE_INTEGER)) {
+      t = q;
+    } else if (!q.array[0][1]) {
+      t = new MetaNum(x.toNumber() + other.toNumber());
+    } else if (q.array[0][1] === 1) {
+      var a = p.array[0][1] ? p.array[0][0] : Math.log10(p.array[0][0]);
+      t = new MetaNum([a + Math.log10(Math.pow(10, q.array[0][0] - a) + 1), 1]);
+    }
+
+    return t;
+  };
+  Q.plus = Q.add = function (x, y) {
+    return new MetaNum(x).add(y);
+  };
+
+  P.minus = P.sub = function (other) {
+    var x = this.clone();
+    other = new MetaNum(other);
+
+    if (x.sign === -1 || x.sign === -2) return x.neg().sub(other.neg()).neg();
+    if (other.sign === -1 || other.sign === -2) return x.add(other.neg());
+    if (x.isNaN() || other.isNaN()) return MetaNum.NaN.clone();
+    if (x.isInfinite() && other.isInfinite()) return MetaNum.NaN.clone();
+    if (x.isInfinite()) return x;
+    if (other.isInfinite()) return other.neg();
+    if (x.eq(other)) return MetaNum.ZERO.clone();
+    if (other.eq(MetaNum.ZERO)) return x;
+
+    var p = x.min(other);
+    var q = x.max(other);
+    var n = other.gt(x);
+    var t;
+
+    if (q.gt(MetaNum.E_MAX_SAFE_INTEGER) || q.div(p).gt(MetaNum.MAX_SAFE_INTEGER)) {
+      t = q;
+      t = n ? t.neg() : t;
+    } else if (!q.array[0][1]) {
+      t = new MetaNum(x.toNumber() - other.toNumber());
+    } else if (q.array[0][1] === 1) {
+      var a = p.array[0][1] ? p.array[0][0] : Math.log10(p.array[0][0]);
+      t = new MetaNum([a + Math.log10(Math.pow(10, q.array[0][0] - a) - 1), 1]);
+      t = n ? t.neg() : t;
+    }
+
+    return t;
+  };
+  Q.minus = Q.sub = function (x, y) {
+    return new MetaNum(x).sub(y);
+  };
+
+  P.times = P.mul = function (other) {
+    var x = this.clone();
+    other = new MetaNum(other);
+
+    var xNS = toNormalizedSign(x.sign);
+    var oNS = toNormalizedSign(other.sign);
+    var resultNormSign = xNS * oNS;
+
+    if (resultNormSign === -1) return x.abs().mul(other.abs()).neg();
+    if (x.sign === -2 || x.sign === -1) return x.abs().mul(other.abs());
+    if (x.isNaN() || other.isNaN()) return MetaNum.NaN.clone();
+    if (x.eq(MetaNum.ZERO) && other.isInfinite()) return MetaNum.NaN.clone();
+    if (x.isInfinite() && other.eq(MetaNum.ZERO)) return MetaNum.NaN.clone();
+    if (other.eq(MetaNum.ZERO)) return MetaNum.ZERO.clone();
+    if (other.eq(MetaNum.ONE)) return x.clone();
+    if (x.eq(MetaNum.ZERO)) return MetaNum.ZERO.clone();
+    if (x.eq(MetaNum.ONE)) return other.clone();
+    if (x.isInfinite()) return x;
+    if (other.isInfinite()) return other;
+
+    if (x.max(other).gt(MetaNum.EE_MAX_SAFE_INTEGER)) return x.max(other);
+
+    if (isSimple(x) && isSimple(other) && !isSmall(x) && !isSmall(other)) {
+      var nx = x.array[0][0];
+      var ny = other.array[0][0];
+      var n = nx * ny;
+      if (isFinite(n) && n !== 0 && Math.abs(n) <= MAX_SAFE_INTEGER) {
+        if (Math.abs(n) < 1) return new MetaNum(1 / Math.abs(n)).rec();
+        return new MetaNum(n);
+      }
+    }
+
+    // General case: result = 10^(log10(x) + log10(y))
+    var logSum = x.log10().add(other.log10());
+    // If logSum is negative (result < 1), compute as reciprocal of positive power
+    if (logSum.sign === -1) {
+      var posLog = logSum.abs();
+      var posResult = MetaNum.pow(MetaNum.TEN, posLog);
+      return posResult.rec();
+    }
+    return MetaNum.pow(MetaNum.TEN, logSum);
+  };
+  Q.times = Q.mul = function (x, y) {
+    return new MetaNum(x).mul(y);
+  };
+
+  P.divide = P.div = function (other) {
+    var x = this.clone();
+    other = new MetaNum(other);
+
+    var xNS = toNormalizedSign(x.sign);
+    var oNS = toNormalizedSign(other.sign);
+    var resultNormSign = xNS * oNS;
+
+    if (resultNormSign === -1) return x.abs().div(other.abs()).neg();
+    if (x.sign === -2 || x.sign === -1) return x.abs().div(other.abs());
+    if (x.isNaN() || other.isNaN()) return MetaNum.NaN.clone();
+    if (x.isInfinite() && other.isInfinite()) return MetaNum.NaN.clone();
+    if (x.eq(MetaNum.ZERO) && other.eq(MetaNum.ZERO)) return MetaNum.NaN.clone();
+    if (other.eq(MetaNum.ZERO)) return MetaNum.POSITIVE_INFINITY.clone();
+    if (other.eq(MetaNum.ONE)) return x.clone();
+    if (x.eq(other)) return MetaNum.ONE.clone();
+    if (x.isInfinite()) return x;
+    if (other.isInfinite()) return MetaNum.ZERO.clone();
+
+    if (x.max(other).gt(MetaNum.EE_MAX_SAFE_INTEGER)) {
+      // Only shortcut if the result would be dominated by one operand
+      if (x.gt(other)) return x.clone();
+      // Otherwise compute properly (result is a small value)
+      var logDiff = x.log10().sub(other.log10());
+      if (logDiff.sign === -1) {
+        return MetaNum.pow(MetaNum.TEN, logDiff.abs()).rec();
+      }
+      return MetaNum.pow(MetaNum.TEN, logDiff);
+    }
+
+    if (x.eq(MetaNum.ZERO)) return MetaNum.ZERO.clone();
+    if (isSimple(x) && isSimple(other) && !isSmall(x) && !isSmall(other)) {
+      var nx = x.array[0][0];
+      var ny = other.array[0][0];
+      var n = nx / ny;
+      if (isFinite(n) && n !== 0 && Math.abs(n) <= MAX_SAFE_INTEGER) {
+        if (Math.abs(n) < 1) return new MetaNum(1 / Math.abs(n)).rec();
+        return new MetaNum(n);
+      }
+    }
+
+    // General case: result = 10^(log10(x) - log10(y))
+    var logDiff = x.log10().sub(other.log10());
+    // If logDiff is negative (result < 1), compute as reciprocal of positive power
+    if (logDiff.sign === -1) {
+      var posLog = logDiff.abs();
+      var posResult = MetaNum.pow(MetaNum.TEN, posLog);
+      return posResult.rec();
+    }
+    var result = MetaNum.pow(MetaNum.TEN, logDiff);
+    var fp = result.floor();
+    if (result.sub(fp).abs().lt(new MetaNum(1e-9))) return fp;
+    return result;
+  };
+  Q.divide = Q.div = function (x, y) {
+    return new MetaNum(x).div(y);
+  };
+
+  P.reciprocate = P.rec = function () {
+    if (this.isNaN()) return MetaNum.NaN.clone();
+    if (this.eq(MetaNum.ZERO)) return MetaNum.NaN.clone();
+    if (this.isInfinite()) return MetaNum.ZERO.clone();
+    var x = this.clone();
+    // Toggle between large and small: 1↔2, -1↔-2
+    x.sign = x.sign === 1 ? 2 : x.sign === 2 ? 1 : x.sign === -1 ? -2 : -1;
+    return x.normalize();
+  };
+  Q.reciprocate = Q.rec = function (x) {
+    return new MetaNum(x).rec();
+  };
+
+  P.toPower = P.pow = function (other) {
+    var x = this.clone();
+    other = new MetaNum(other);
+    if (x.isNaN() || other.isNaN()) return MetaNum.NaN.clone();
+    if (x.sign === -1 || x.sign === -2) {
+      var absPow = this.abs().pow(other);
+      if (other.isint()) {
+        return other.mod(2).eq(0) ? absPow : absPow.neg();
+      }
+      return MetaNum.NaN.clone();
+    }
+    if (other.eq(MetaNum.ZERO)) return MetaNum.ONE.clone();
+    if (x.eq(MetaNum.ZERO)) return MetaNum.ZERO.clone();
+    if (x.eq(MetaNum.ONE)) return MetaNum.ONE.clone();
+    if (other.eq(MetaNum.ONE)) return x.clone();
+    if (x.isInfinite() || other.isInfinite()) return x;
+    if (isSimple(x) && isSimple(other)) {
+      var powVal = Math.pow(x.toNumber(), other.toNumber());
+      if (Number.isFinite(powVal) && Math.abs(powVal) <= MAX_SAFE_INTEGER && powVal !== 0) return new MetaNum(powVal);
+    }
+    if (x.eq(MetaNum.TEN) && !isSmall(other)) {
+      if (other.layer > 0 || other.array.length > 1) return other;
+      var newRow0 = other.array[0].slice(0);
+      newRow0[1] = (newRow0[1] || 0) + 1;
+      return new MetaNum(newRow0);
+    }
+    // For small exponents: 10^small approaches 1 from above
+    if (isSimple(x) && isSimple(other) && isSmall(other)) {
+      var smallPow = Math.pow(x.toNumber(), other.toNumber());
+      if (Number.isFinite(smallPow)) return new MetaNum(smallPow);
+    }
+    // For very small exponents on 10, return approximately 1
+    if (x.eq(MetaNum.TEN) && isSmall(other)) {
+      // 10^(very small) ≈ 1 + small*ln(10), which rounds to 1 for our purposes
+      return MetaNum.ONE.clone();
+    }
+    var logResult = x.log10().mul(other);
+    if (logResult.sign === -1 || logResult.sign === -2) {
+      var posResult = MetaNum.pow(10, logResult.neg());
+      posResult.sign = posResult.sign === 1 ? 2 : posResult.sign === 2 ? 1 : posResult.sign === -1 ? -2 : -1;
+      return posResult.normalize();
+    }
+    return MetaNum.pow(10, logResult);
+  };
+  Q.toPower = Q.pow = function (x, y) {
+    return new MetaNum(x).pow(y);
+  };
+
+  P.exponential = P.exp = function () {
+    if (this.isNaN()) return MetaNum.NaN.clone();
+    if (this.sign === -1 || this.sign === -2) return this.abs().exp().rec();
+    if (isSimple(this) && !isSmall(this)) {
+      var ev = Math.exp(this.array[0][0]);
+      if (Number.isFinite(ev) && Math.abs(ev) <= MAX_SAFE_INTEGER) return new MetaNum(ev);
+    }
+    return this;
+  };
+  Q.exponential = Q.exp = function (x) {
+    return new MetaNum(x).exp();
+  };
+
+  P.squareRoot = P.sqrt = function () {
+    if (this.isNaN() || this.sign === -1 || this.sign === -2) return MetaNum.NaN.clone();
+    if (this.eq(MetaNum.ZERO)) return MetaNum.ZERO.clone();
+    if (isSimple(this) && !isSmall(this)) return new MetaNum(Math.sqrt(this.array[0][0]));
+    return this;
+  };
+  Q.squareRoot = Q.sqrt = function (x) {
+    return new MetaNum(x).sqrt();
+  };
+
+  P.cubeRoot = P.cbrt = function () {
+    if (this.isNaN()) return MetaNum.NaN.clone();
+    if (this.eq(MetaNum.ZERO)) return MetaNum.ZERO.clone();
+    if (this.sign === -1 || this.sign === -2) return this.abs().cbrt().neg();
+    if (isSimple(this)) return new MetaNum(Math.cbrt(this.array[0][0]));
+    return this;
+  };
+  Q.cubeRoot = Q.cbrt = function (x) {
+    return new MetaNum(x).cbrt();
+  };
+
+  P.root = function (other) {
+    var x = this.clone();
+    other = new MetaNum(other);
+    if (x.isNaN() || other.isNaN()) return MetaNum.NaN.clone();
+    if (x.isInfinite()) return x;
+    if (other.eq(MetaNum.ZERO)) return MetaNum.POSITIVE_INFINITY.clone();
+    if (x.sign === -1 || x.sign === -2) {
+      if (other.mod(2).eq(MetaNum.ONE)) return x.abs().root(other).neg();
+      return MetaNum.NaN.clone();
+    }
+    if (isSimple(x) && isSimple(other)) return new MetaNum(Math.pow(x.array[0][0], 1 / other.array[0][0]));
+    return x;
+  };
+  Q.root = function (x, y) {
+    return new MetaNum(x).root(y);
+  };
+
+  P.generalLogarithm = P.log10 = function () {
+    if (this.isNaN() || this.sign === -1 || this.sign === -2) return MetaNum.NaN.clone();
+    if (this.isInfinite()) return this;
+    if (isSmall(this)) {
+      // Small value: log10 is negative of what it would be for the normal value
+      var n = this.clone();
+      n.sign = 1; // Convert to normal positive for computation
+      var result = n.log10();
+      // Result should be negative (because log10 of a small number is negative)
+      // Need to handle this carefully - after conversion, the result is the magnitude
+      // which we need to negate
+      return result.neg();
+    }
+    if (this.eq(MetaNum.ZERO)) return MetaNum.NEGATIVE_INFINITY.clone();
+    if (isSimple(this)) {
+      var lv = Math.log10(this.array[0][0]);
+      if (Number.isFinite(lv)) return new MetaNum(lv);
+    }
+    if (this.layer === 0 && this.array.length === 1 && this.array[0].length > 1) {
+      var r0 = this.array[0];
+      if (r0[1] > 0) {
+        var newR0 = r0.slice(0);
+        newR0[1]--;
+        return new MetaNum(newR0);
+      }
+      return this;
+    }
+    return this;
+  };
+  Q.generalLogarithm = Q.log10 = function (x) {
+    return new MetaNum(x).log10();
+  };
+
+  P.logarithm = P.logBase = P.log = function (base) {
+    var x = this.clone();
+    if (x.isNaN() || x.sign === -1 || x.sign === -2) return MetaNum.NaN.clone();
+    base = new MetaNum(base);
+    if (base.isNaN() || base.eq(MetaNum.ZERO) || base.eq(MetaNum.ONE)) return MetaNum.NaN.clone();
+    if (x.eq(MetaNum.ZERO)) return MetaNum.NEGATIVE_INFINITY.clone();
+    if (x.eq(MetaNum.ONE)) return MetaNum.ZERO.clone();
+    if (isSimple(x) && isSimple(base)) {
+      var lv = Math.log(x.array[0][0]) / Math.log(base.array[0][0]);
+      if (Number.isFinite(lv)) return new MetaNum(lv);
+    }
+    return x.log10().div(base.log10());
+  };
+  Q.logarithm = Q.logBase = Q.log = function (x, base) {
+    return new MetaNum(x).logBase(base);
+  };
+
+  P.naturalLogarithm = P.ln = function () {
+    if (this.isNaN() || this.sign === -1 || this.sign === -2) return MetaNum.NaN.clone();
+    if (this.eq(MetaNum.ZERO)) return MetaNum.NEGATIVE_INFINITY.clone();
+    if (this.isInfinite()) return this;
+    if (isSimple(this)) {
+      var lv = Math.log(this.array[0][0]);
+      if (Number.isFinite(lv)) return new MetaNum(lv);
+    }
+    return this.log10().div(new MetaNum(Math.LOG10E));
+  };
+  Q.naturalLogarithm = Q.ln = function (x) {
+    return new MetaNum(x).ln();
+  };
+
+  P.modular = P.mod = function (other) {
+    other = new MetaNum(other);
+    if (other.eq(MetaNum.ZERO)) return MetaNum.ZERO.clone();
+    var tNS = toNormalizedSign(this.sign);
+    var oNS = toNormalizedSign(other.sign);
+    if (tNS * oNS === -1) return this.abs().mod(other.abs()).neg();
+    if (this.sign === -1 || this.sign === -2) return this.abs().mod(other.abs());
+    return this.sub(this.div(other).floor().mul(other));
+  };
+  Q.modular = Q.mod = function (x, y) {
+    return new MetaNum(x).mod(y);
+  };
+
+  P.gamma = function () {
+    if (this.sign === -1 || this.sign === -2) return MetaNum.NaN.clone();
+    if (this.isNaN() || this.isInfinite()) return this.clone();
+    if (isSimple(this)) {
+      var n = this.array[0][0];
+      if (Number.isInteger(n) && n >= 0 && n <= 100) {
+        var f = 1;
+        for (var i = 2; i < n; i++) f *= i;
+        return new MetaNum(f);
+      }
+      var g = f_gamma(n);
+      if (Number.isFinite(g) && Math.abs(g) <= MAX_SAFE_INTEGER) return new MetaNum(g);
+      var logG = f_logGamma(n);
+      if (Number.isFinite(logG)) {
+        return MetaNum.pow(10, new MetaNum(logG));
+      }
+    }
+    return this;
+  };
+  Q.gamma = function (x) {
+    return new MetaNum(x).gamma();
+  };
+
+  P.factorial = P.fact = function () {
+    if (this.isNaN() || this.isInfinite()) return this;
+    if (this.sign === -1 || this.sign === -2) return this.abs().fact().neg();
+    if (isSimple(this)) {
+      var n = this.array[0][0];
+      if (Number.isInteger(n) && n >= 0 && n <= 20) {
+        var f = 1;
+        for (var i = 2; i <= n; i++) f *= i;
+        return new MetaNum(f);
+      }
+      var fa = f_gamma(n + 1);
+      if (Number.isFinite(fa) && Math.abs(fa) <= MAX_SAFE_INTEGER) return new MetaNum(fa);
+      var logFa = f_logGamma(n + 1);
+      if (Number.isFinite(logFa)) {
+        return MetaNum.pow(10, new MetaNum(logFa));
+      }
+    }
+    return this;
+  };
+  Q.factorial = Q.fact = function (x) {
+    return new MetaNum(x).fact();
+  };
+
+  P.lambertw = function (tol, principal) {
+    if (tol === undefined) tol = 1e-10;
+    if (principal === undefined) principal = true;
+    if (this.isNaN()) return MetaNum.NaN.clone();
+    if (this.isInfinite()) return this.clone();
+    if (isSimple(this)) {
+      try {
+        return new MetaNum(f_lambertw(this.array[0][0], tol, principal));
+      } catch (e) {
+        return MetaNum.NaN.clone();
+      }
+    }
+    return d_lambertw(this, tol, principal);
+  };
+  Q.lambertw = function (x, tol, principal) {
+    return new MetaNum(x).lambertw(tol, principal);
+  };
+
+  P.floor = function () {
+    if (this.isNaN() || this.isInfinite()) return this.clone();
+    if (isSmall(this)) {
+      // Small positive → 0, small negative → -1
+      return this.sign === 2 ? MetaNum.ZERO.clone() : MetaNum.NEGATIVE_ONE.clone();
+    }
+    if (this.layer > 0 || this.array.length > 1 || this.array[0].length > 1) return this.clone();
+    return new MetaNum(Math.floor(this.array[0][0]));
+  };
+  Q.floor = function (x) {
+    return new MetaNum(x).floor();
+  };
+
+  P.ceiling = P.ceil = function () {
+    if (this.isNaN() || this.isInfinite()) return this.clone();
+    if (isSmall(this)) {
+      // Small positive → 1, small negative → 0
+      return this.sign === 2 ? MetaNum.ONE.clone() : MetaNum.ZERO.clone();
+    }
+    if (this.layer > 0 || this.array.length > 1 || this.array[0].length > 1) return this.clone();
+    return new MetaNum(Math.ceil(this.array[0][0]));
+  };
+  Q.ceiling = Q.ceil = function (x) {
+    return new MetaNum(x).ceil();
+  };
+
+  P.round = function () {
+    if (this.isNaN() || this.isInfinite()) return this.clone();
+    if (isSmall(this)) return MetaNum.ZERO.clone();
+    if (this.layer > 0 || this.array.length > 1 || this.array[0].length > 1) return this.clone();
+    return new MetaNum(Math.round(this.array[0][0]));
+  };
+  Q.round = function (x) {
+    return new MetaNum(x).round();
+  };
+
+  P.isInteger = P.isint = function () {
+    if (this.isNaN() || this.isInfinite()) return false;
+    if (isSmall(this)) return false; // Small values are between 0 and 1, not integers
+    if (this.sign === -1) return this.abs().isint();
+    if (this.layer > 0 || this.array.length > 1 || this.array[0].length > 1) return true;
+    return Number.isInteger(this.array[0][0]);
+  };
+  Q.isInteger = Q.isint = function (x) {
+    return new MetaNum(x).isint();
+  };
+
+  P.tetrate = P.tetr = function (other, payload) {
+    if (payload === undefined) payload = MetaNum.ONE;
+    var x = this.clone();
+    other = new MetaNum(other);
+    payload = new MetaNum(payload);
+    if (payload.neq(MetaNum.ONE)) other = other.add(payload.slog(x));
+    if (x.isNaN() || other.isNaN() || payload.isNaN()) return MetaNum.NaN.clone();
+    if (other.sign === -1 || other.sign === -2) {
+      if (other.eq(-1)) return MetaNum.ZERO.clone();
+      return MetaNum.NaN.clone();
+    }
+    if (other.eq(MetaNum.NEGATIVE_INFINITY)) return MetaNum.ZERO.clone();
+    if (other.eq(MetaNum.ZERO)) return MetaNum.ONE.clone();
+    if (other.eq(MetaNum.ONE)) return x.clone();
+    if (other.eq(2)) return x.pow(x);
+    if (x.eq(MetaNum.ZERO)) {
+      if (other.eq(MetaNum.ZERO)) return MetaNum.NaN.clone();
+      if (other.mod(2).eq(MetaNum.ZERO)) return MetaNum.ONE.clone();
+      return MetaNum.ZERO.clone();
+    }
+    if (x.eq(MetaNum.ONE)) return MetaNum.ONE.clone();
+    if (x.eq(2)) {
+      if (other.eq(3)) return new MetaNum(16);
+      if (other.eq(4)) return new MetaNum(65536);
+    }
+    if (x.isInfinite() || other.isInfinite()) return x.max(other);
+    var m = x.max(other);
+    if (m.gt(hyperLevel(3, MAX_SAFE_INTEGER))) return m;
+    if (m.gt(MetaNum.TETRATED_MAX_SAFE_INTEGER) || other.gt(MetaNum.MAX_SAFE_INTEGER)) {
+      var j = x.slog(10).add(other);
+      j.array[0][2] = (j.array[0][2] || 0) + 1;
+      j.normalize();
+      return j;
+    }
+    var y = other.toNumber();
+    var f = Math.floor(y);
+    var r = x.pow(y - f);
+    for (var i = 0; f !== 0 && r.lt(MetaNum.E_MAX_SAFE_INTEGER) && i < 100; i++) {
+      if (f > 0) {
+        r = x.pow(r);
+        f--;
+      }
+    }
+    if (i === 100) f = 0;
+    r.array[0][1] = (r.array[0][1] + f) || f;
+    r.normalize();
+    return r;
+  };
+  Q.tetrate = Q.tetr = function (x, y, payload) {
+    return new MetaNum(x).tetr(y, payload);
+  };
+
+  P.iteratedexp = function (other) {
+    var x = this.clone();
+    other = new MetaNum(other);
+    if (other.sign === -1 || other.sign === -2) return MetaNum.ZERO.clone();
+    if (isSimple(x) && isSimple(other) && Number.isInteger(other.array[0][0]) && other.array[0][0] <= 4) {
+      var iv = x.array[0][0];
+      var ic = other.array[0][0];
+      var r = iv;
+      for (var i = 0; i < ic; i++) r = Math.pow(10, r);
+      if (Number.isFinite(r) && Math.abs(r) <= MAX_SAFE_INTEGER) return new MetaNum(r);
+    }
+    return x;
+  };
+  Q.iteratedexp = function (x, y) {
+    return new MetaNum(x).iteratedexp(y);
+  };
+
+  P.iteratedlog = function (other) {
+    var x = this.clone();
+    other = new MetaNum(other);
+    if (other.sign === -1 || other.sign === -2) return MetaNum.POSITIVE_INFINITY.clone();
+    if (other.eq(MetaNum.ZERO)) return x.clone();
+    if (isSimple(x) && isSimple(other) && Number.isInteger(other.array[0][0]) && other.array[0][0] <= 4) {
+      var iv = x.array[0][0];
+      var ic = other.array[0][0];
+      if (ic <= 0) return x.clone();
+      var r = iv;
+      for (var i = 0; i < ic; i++) r = Math.log10(r);
+      return new MetaNum(r);
+    }
+    return x;
+  };
+  Q.iteratedlog = function (x, y) {
+    return new MetaNum(x).iteratedlog(y);
+  };
+
+  P.layeradd = function (other, base) {
+    if (base == null) base = 10;
+    var x = this.clone();
+    other = new MetaNum(other);
+    base = new MetaNum(base);
+    if (x.isNaN() || other.isNaN() || base.isNaN()) return MetaNum.NaN.clone();
+    if (other.eq(MetaNum.ZERO)) return x.clone();
+    if (other.sign === -1 || other.sign === -2) return MetaNum.ZERO.clone();
+    return x.tetr(other).tetr(base).logBase(base);
+  };
+  Q.layeradd = function (x, y, base) {
+    return new MetaNum(x).layeradd(y, base);
+  };
+
+  P.layeradd10 = function (other) {
+    return this.layeradd(other, 10);
+  };
+  Q.layeradd10 = function (x, y) {
+    return new MetaNum(x).layeradd10(y);
+  };
+
+  P.ssqrt = P.ssrt = function () {
+    if (this.sign === -1 || this.sign === -2) return MetaNum.NaN.clone();
+    if (this.isNaN()) return MetaNum.NaN.clone();
+    if (this.eq(MetaNum.ZERO)) return MetaNum.ZERO.clone();
+    if (this.eq(MetaNum.ONE)) return MetaNum.ONE.clone();
+    if (isSimple(this)) {
+      var v = this.array[0][0];
+      if (v > 0 && v < 1) return new MetaNum(v);
+      try {
+        var w = f_lambertw(Math.log(v));
+        if (Number.isFinite(w)) return new MetaNum(Math.exp(w));
+      } catch (e) {}
+    }
+    var ln = this.ln();
+    var w = ln.lambertw();
+    return w.exp();
+  };
+  Q.ssqrt = Q.ssrt = function (x) {
+    return new MetaNum(x).ssqrt();
+  };
+
+  P.linear_sroot = function (other) {
+    var x = this.clone();
+    other = new MetaNum(other);
+    if (x.isNaN() || other.isNaN()) return MetaNum.NaN.clone();
+    if (x.sign === -1 || x.sign === -2 || other.sign === -1 || other.sign === -2) return MetaNum.NaN.clone();
+    if (other.eq(MetaNum.ZERO)) return MetaNum.ZERO.clone();
+    if (other.eq(MetaNum.ONE)) return x.clone();
+    if (isSimple(x) && isSimple(other) && other.array[0][0] > 1) {
+      var v = x.array[0][0];
+      var n = other.array[0][0];
+      try {
+        var w = f_lambertw((n - 1) * Math.log(v / (n - 1)));
+        if (Number.isFinite(w)) return new MetaNum(Math.exp(w));
+      } catch (e) {}
+    }
+    return x;
+  };
+  Q.linear_sroot = function (x, y) {
+    return new MetaNum(x).linear_sroot(y);
+  };
+
+  P.slog = function (base) {
+    if (base === undefined) base = 10;
+    var x = this.clone();
+    base = new MetaNum(base);
+    if (x.isNaN() || base.isNaN()) return MetaNum.NaN.clone();
+    if (x.sign === -1 || x.sign === -2 || base.sign === -1 || base.sign === -2) return MetaNum.NaN.clone();
+    if (x.eq(MetaNum.ONE)) return MetaNum.ZERO.clone();
+    if (x.lt(MetaNum.ONE)) return MetaNum.fromNumber(-1).add(x.slog(base));
+    var m = x.max(base);
+    if (m.gt(hyperLevel(3, MAX_SAFE_INTEGER))) {
+      if (x.gt(base)) return x.clone();
+      return MetaNum.ZERO.clone();
+    }
+    if (m.gt(MetaNum.TETRATED_MAX_SAFE_INTEGER)) {
+      if (x.gt(base)) {
+        x.array[0][2]--;
+        x.normalize();
+        return x.sub(x.array[0][1] || 0);
+      }
+      return MetaNum.ZERO.clone();
+    }
+    if (isSimple(x) && isSimple(base) && base.array[0][0] > 1) {
+      var v = x.array[0][0];
+      var b = base.array[0][0];
+      if (v <= Math.pow(b, b)) {
+        if (v <= 1) return MetaNum.ZERO.clone();
+        var sl = 0;
+        while (Math.pow(b, b) >= v && sl < 10) {
+          v = Math.log(v) / Math.log(b);
+          sl++;
+          if (v <= 0) break;
+        }
+        if (sl > 0) return new MetaNum(sl + v - 1);
+      }
+    }
+    var r = 0;
+    var t = (x.array[0][1] || 0) - (base.array[0][1] || 0);
+    if (t > 3) {
+      var l = t - 3;
+      r += l;
+      x.array[0][1] = x.array[0][1] - l;
+    }
+    for (var i = 0; i < 100; i++) {
+      if (x.lt(0)) {
+        x = MetaNum.pow(base, x);
+        r--;
+      } else if (x.lte(1)) {
+        return new MetaNum(r + x.array[0][0] - 1);
+      } else {
+        r++;
+        x = x.logBase(base);
+      }
+    }
+    if (x.gt(10)) return new MetaNum(r);
+    return new MetaNum(r + x.array[0][0] - 1);
+  };
+  Q.slog = function (x, base) {
+    return new MetaNum(x).slog(base);
+  };
+
+  P.pentate = P.pent = function (other) {
+    return this.arrow(3)(other);
+  };
+  Q.pentate = Q.pent = function (x, y) {
+    return MetaNum.arrow(x, 3, y);
+  };
+
+  //pentate_log和pentate_root
+  P.pentate_log = P.pent_log = function (base) {
+    if (base === undefined) base = 10;
+    var x = this.clone();
+    base = new MetaNum(base);
+    if (x.isNaN() || base.isNaN()) return MetaNum.NaN.clone();
+    if (x.sign === -1 || x.sign === -2 || base.sign === -1 || base.sign === -2) return MetaNum.NaN.clone();
+    if (x.eq(MetaNum.ONE)) return MetaNum.ZERO.clone();
+    if (x.eq(base)) return MetaNum.ONE.clone();
+    if (x.lt(base)) return MetaNum.ZERO.clone();
+    var m = x.max(base);
+    if (m.gt(hyperLevel(4, MAX_SAFE_INTEGER))) {
+      if (x.gt(base)) return x.clone();
+      return MetaNum.ZERO.clone();
+    }
+    if (isSimple(x) && isSimple(base) && base.array[0][0] > 1) {
+      var v = x.array[0][0];
+      var b = base.array[0][0];
+      var count = 0;
+      while (v > b && count < 100) {
+        var slogVal = new MetaNum(v).slog(base);
+        if (slogVal.array.length <= 1 && slogVal.array[0].length <= 1) {
+          v = slogVal.array[0][0];
+          count++;
+        } else {
+          return new MetaNum(count).add(slogVal);
+        }
+      }
+      if (count > 0) return new MetaNum(count).add(new MetaNum(v).slog(base));
+    }
+    var r = 0;
+    for (var i = 0; i < 100; i++) {
+      if (x.lte(base)) {
+        if (x.lte(1)) return new MetaNum(r);
+        return new MetaNum(r + x.array[0][0] / base.array[0][0]);
+      } else {
+        r++;
+        x = x.slog(base);
+      }
+    }
+    if (x.gt(10)) return new MetaNum(r);
+    return new MetaNum(r);
+  };
+  Q.pentate_log = Q.pent_log = function (x, base) {
+    return new MetaNum(x).pentate_log(base);
+  };
+
+  P.pentate_root = P.pent_root = function (height) {
+    var x = this.clone();
+    height = new MetaNum(height);
+    if (x.isNaN() || height.isNaN()) return MetaNum.NaN.clone();
+    if (x.sign === -1 || x.sign === -2 || height.sign === -1 || height.sign === -2) return MetaNum.NaN.clone();
+    if (height.eq(MetaNum.ZERO)) {
+      if (x.eq(MetaNum.ONE)) return MetaNum.NaN.clone();
+      return MetaNum.NaN.clone();
+    }
+    if (height.eq(MetaNum.ONE)) return x.clone();
+    if (height.eq(2) && isSimple(x)) {
+      var v2 = x.array[0][0];
+      if (v2 <= 1) return MetaNum.ONE.clone();
+      var lo2 = 1;
+      var hi2 = Math.max(2, v2);
+      for (var i2 = 0; i2 < 50; i2++) {
+        var mid2 = (lo2 + hi2) / 2;
+        var val2 = MetaNum.pentate(mid2, 2);
+        if (val2.eq(x)) return new MetaNum(mid2);
+        if (val2.lt(x)) lo2 = mid2;
+        else hi2 = mid2;
+      }
+      return new MetaNum((lo2 + hi2) / 2);
+    }
+    if (isSimple(x) && isSimple(height)) {
+      var v = x.array[0][0];
+      var h = height.array[0][0];
+      if (h >= 2 && Number.isInteger(h)) {
+        var lo = 1;
+        var hi = Math.max(2, v);
+        for (var i = 0; i < 50; i++) {
+          var mid = (lo + hi) / 2;
+          var val = MetaNum.pentate(mid, h);
+          if (val.eq(x)) return new MetaNum(mid);
+          if (val.lt(x)) lo = mid;
+          else hi = mid;
+        }
+        return new MetaNum((lo + hi) / 2);
+      }
+    }
+    if (isSimple(height) && height.array[0][0] >= 2) {
+      var lo2 = new MetaNum(1);
+      var hi2 = x.clone();
+      for (var i = 0; i < 50; i++) {
+        var mid2 = lo2.add(hi2).div(2);
+        var val2 = MetaNum.pentate(mid2, height);
+        if (val2.eq(x)) return mid2;
+        if (val2.lt(x)) lo2 = mid2;
+        else hi2 = mid2;
+      }
+      return lo2.add(hi2).div(2);
+    }
+    return x;
+  };
+  Q.pentate_root = Q.pent_root = function (x, height) {
+    return new MetaNum(x).pentate_root(height);
+  };
+  
+
+  P.arrow = function (arrows) {
+    var t = this.clone();
+    arrows = new MetaNum(arrows);
+    if (!arrows.isint() || arrows.sign === -1 || arrows.sign === -2) return function () { return MetaNum.NaN.clone(); };
+    if (arrows.eq(MetaNum.ZERO)) return function (other) { return t.mul(other); };
+    if (arrows.eq(MetaNum.ONE)) return function (other) { return t.pow(other); };
+    if (arrows.eq(2)) return function (other) { return t.tetr(other); };
+    return function (other) {
+      other = new MetaNum(other);
+      if (other.sign === -1 || other.sign === -2) return MetaNum.NaN.clone();
+      if (other.eq(MetaNum.ZERO)) return MetaNum.ONE.clone();
+      if (other.eq(MetaNum.ONE)) return t.clone();
+      if (other.eq(2)) return t.arrow(arrows.sub(MetaNum.ONE))(t);
+      var arrowsNum = arrows.toNumber();
+      if (!isFinite(arrowsNum)) {
+        // arrows is a huge MetaNum (ω-level): result inherits the largest structure
+        var j = t.max(other).max(arrows).clone();
+        j.array.push([1, 0, 1]);
+        j.normalize();
+        return j;
+      }
+      if (arrows.gte(MetaNum.maxArrow)) {
+        // arrows is very large but still a JS number; use approximate overflow
+        var j = t.max(other).clone();
+        j.array.push([1, 0, 1]);
+        j.normalize();
+        return j;
+      }
+      if (arrowsNum >= MetaNum.maxCols && t.array.length === 1 && other.array.length === 1) {
+        var a = t.array[0][0];
+        var b = other.array[0][0];
+        if (b >= 2) {
+          var count = b - 2;
+          var baseResult = t.arrow(MetaNum.maxCols - 1)(other);
+          if (arrowsNum === MetaNum.maxCols) {
+            baseResult.array[0][MetaNum.maxCols - 1] = (baseResult.array[0][MetaNum.maxCols - 1] || 0) + count;
+            baseResult.normalize();
+            return baseResult;
+          }
+          if (arrowsNum === MetaNum.maxCols + 1) {
+            baseResult.array[0][MetaNum.maxCols - 1] = (baseResult.array[0][MetaNum.maxCols - 1] || 0) + count;
+            baseResult.normalize();
+            baseResult = addOrdinalRow(baseResult, count, MetaNum.maxCols);
+            baseResult.normalize();
+            return baseResult;
+          }
+          var endLevel = arrowsNum - 1;
+          var startLevel = MetaNum.maxCols;
+          var totalOrdinal = endLevel - startLevel + 1;
+          if (totalOrdinal + 1 <= MetaNum.maxRows) {
+            var r = t.arrow(MetaNum.maxCols - 1)(other);
+            for (var lev = startLevel; lev <= endLevel; lev++) {
+              r = addOrdinalRow(r, count, lev);
+            }
+          } else {
+            var r = new MetaNum(10);
+            var keepStart = endLevel - MetaNum.maxRows + 2;
+            for (var lev = keepStart; lev <= endLevel; lev++) {
+              r = addOrdinalRow(r, count, lev);
+            }
+          }
+          r.normalize();
+          return r;
+        }
+      }
+      if (arrowsNum > 1000000) {
+        var j = t.max(other).clone();
+        j.array.push([1, 0, 1]);
+        j.normalize();
+        return j;
+      }
+      if (t.max(other).gt(hyperLevelSafe(arrowsNum + 1, MAX_SAFE_INTEGER))) return t.max(other);
+      if (t.gt(hyperLevelSafe(arrowsNum, MAX_SAFE_INTEGER)) || other.gt(MetaNum.MAX_SAFE_INTEGER)) {
+        var r;
+        if (t.gt(hyperLevelSafe(arrowsNum, MAX_SAFE_INTEGER))) {
+          r = t.clone();
+          if (arrowsNum < MetaNum.maxCols) {
+            r.array[0][arrowsNum]--;
+          } else {
+            var lastRow = r.array[r.array.length - 1];
+            if (lastRow && lastRow.length >= 2 && typeof lastRow[lastRow.length - 1] === 'number') {
+              lastRow[0] = (lastRow[0] || 0) - 1;
+              if (lastRow[0] <= 0) r.array.pop();
+            }
+          }
+          r.normalize();
+        } else if (t.gt(hyperLevelSafe(arrowsNum - 1, MAX_SAFE_INTEGER))) {
+          if (arrowsNum - 1 < MetaNum.maxCols) {
+            r = new MetaNum(t.array[0][arrowsNum - 1]);
+          } else {
+            r = MetaNum.ZERO.clone();
+          }
+        } else {
+          r = MetaNum.ZERO.clone();
+        }
+        var j = r.add(other);
+        if (arrowsNum < MetaNum.maxCols) {
+          j.array[0][arrowsNum] = (j.array[0][arrowsNum] || 0) + 1;
+        } else {
+          j = addOrdinalRow(j, 1, arrowsNum);
+        }
+        j.normalize();
+        return j;
+      }
+      var y = other.toNumber();
+      var f = Math.floor(y);
+      var arrows_m1 = arrows.sub(MetaNum.ONE);
+      var r = t.arrow(arrows_m1)(y - f);
+      var initFloor = Math.floor(other.toNumber());
+      for (var i = 0; f !== 0 && r.lt(hyperLevelSafe(arrowsNum - 1, MAX_SAFE_INTEGER)) && i < 100; i++) {
+        if (f > 0) {
+          r = t.arrow(arrows_m1)(r);
+          f--;
+        }
+      }
+      if (i === 100) f = 0;
+      if (arrowsNum - 1 < MetaNum.maxCols) {
+        if (f > 0) {
+          r.array[0][arrowsNum - 1] = (r.array[0][arrowsNum - 1] || 0) + f;
+        }
+      } else {
+        var count = f > 0 ? f : (i > 0 && initFloor > 0 ? initFloor - 1 : 0);
+        if (count > 0) {
+          r = addOrdinalRow(r, count, arrowsNum - 1);
+        }
+      }
+      r.normalize();
+      return r;
+    };
+  };
+  P.chain = function (other, arrows) {
+    return this.arrow(arrows)(other);
+  };
+  Q.arrow = function (x, arrows, y) {
+    return new MetaNum(x).arrow(arrows)(y);
+  };
+  Q.chain = function (x, y, arrows) {
+    return new MetaNum(x).arrow(arrows)(y);
+  };
+
+  //calc level ω = x{y}x
+  P.aperiote = P.aper = P.h10 = function (y) {
+    return this.arrow(y)(this);
+  };
+  Q.aperiote = Q.aper = Q.h10 = function (x, y) {
+    return new MetaNum(x).arrow(y)(x);
+  };
+
+  P.inv_aperiote = P.i_aper = P.i10 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 0 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length === 2 && row[1] > 0) {
+          return new MetaNum(row[1] + 1);
+        }
+      }
+      return result;
+    }
+    if (z.layer === 0 && z.array.length === 1) {
+      var r0 = z.array[0];
+      if (r0.length > 1 && r0[1] > 0) {
+        return new MetaNum(r0[1] + 1);
+      }
+      return new MetaNum(1);
+    }
+    return z;
+  };
+  Q.inv_aperiote = Q.i_aper = Q.i10 = function (x, z) {
+    return new MetaNum(x).inv_aperiote(z);
+  };
+
+  //ω+1 x{{1}}y
+  P.expande = P.expa = P.h11 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.clone();
+    if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
+    var base = x.aperiote(x);  // expande(x, 2) = x{x}x
+    if (y.layer === 0 && y.array.length <= 1) {
+      // finite y: r0 from base, [y-2, 0, 1] for ω+1 level
+      var result = base.clone();
+      if (y.eq(2)) return result;
+      var count = y.toNumber() - 2;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        result.array.push([count, 0, 1]);
+        result.normalize();
+      }
+      return result;
+    }
+    // ordinal y: clone y, set r0, add [1, 1, 1]
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 1, 1]);
+    result.normalize();
+    return result;
+  };
+  Q.expande = Q.expa = Q.h11 = function (x, y) {
+    return new MetaNum(x).expande(y);
+  };
+
+  P.inv_expande = P.i_expa = P.i11 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      // First: find ordinal marker [1, 1, 1]
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 1 && row[2] === 1 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      // Second: find iteration count [count, 0, 1]
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 0 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      // Fallback: finite-level result
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row2 = result.array[i];
+        if (row2.length === 2 && row2[1] > 0) {
+          return new MetaNum(row2[1] + 1);
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_expande = Q.i_expa = Q.i11 = function (x, z) {
+    return new MetaNum(x).inv_expande(z);
+  };
+
+  //ω+2 x{{2}}y
+  P.multiexpande = P.muea = P.h12 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.clone();
+    if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
+    var base = x.expande(x);  // multiexpande(x, 2)
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      if (y.eq(2)) return result;
+      var count = y.toNumber() - 2;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        result.array.push([1, 0, 1]);
+        result.array.push([count, 1, 1]);
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 2, 1]);
+    result.normalize();
+    return result;
+  };
+  Q.multiexpande = Q.muea = Q.h12 = function (x, y) {
+    return new MetaNum(x).multiexpande(y);
+  };
+
+  P.inv_multiexpande = P.i_muea = P.i12 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 2 && row[2] === 1 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 1 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_multiexpande = Q.i_muea = Q.i12 = function (x, z) {
+    return new MetaNum(x).inv_multiexpande(z);
+  };
+
+  //ω+3 x{{3}}y
+  P.powerexpande = P.poea = P.h13 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.clone();
+    if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
+    var base = x.multiexpande(x);  // powerexpande(x, 2)
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      if (y.eq(2)) return result;
+      var count = y.toNumber() - 2;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        result.array.push([1, 0, 1]);
+        result.array.push([1, 1, 1]);
+        result.array.push([count, 2, 1]);
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 3, 1]);
+    result.normalize();
+    return result;
+  };
+  Q.powerexpande = Q.poea = Q.h13 = function (x, y) {
+    return new MetaNum(x).powerexpande(y);
+  };
+
+  P.inv_powerexpande = P.i_poea = P.i13 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 3 && row[2] === 1 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 2 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_powerexpande = Q.i_poea = Q.i13 = function (x, z) {
+    return new MetaNum(x).inv_powerexpande(z);
+  };
+
+  //ω*2 x{{y}}x
+  P.aperioexpande = P.apea = P.h20 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.expande(x);
+    if (y.eq(2)) return x.multiexpande(x);
+    if (y.eq(3)) return x.powerexpande(x);
+    var base = x.powerexpande(x);  // aperioexpande(x, 3)
+    if (y.layer === 0 && y.array.length <= 1) {
+      var yNum = y.toNumber();
+      if (yNum > Number.MAX_SAFE_INTEGER || !isFinite(yNum)) {
+        // Very large y: result at ω*2 level
+        // y is already in magnitude form (e.g., [[16,1]] for 1e16), just add ω*2 marker
+        var result = y.clone();
+        result.layer = 0;
+        result.array.push([1, 0, 2]);
+        result.normalize();
+        return result;
+      }
+      // Finite y: generate rows [1, i, 1] for i from 0 to yNum-1
+      var totalRows = yNum - 1;
+      var maxRows = MetaNum.maxRows - 1;
+      var result = base.clone();
+      if (yNum <= 2) return result;
+      result.layer = 0;
+      if (totalRows <= maxRows) {
+        // No truncation needed
+        result.array = [base.array[0].slice()];
+        for (var i = 0; i < totalRows; i++) {
+          result.array.push([1, i, 1]);
+        }
+      } else {
+        // Truncate: keep last maxRows rows
+        result.array = [[10]];
+        var keepStart = yNum - maxRows;
+        for (var i = keepStart; i < yNum; i++) {
+          result.array.push([1, i, 1]);
+        }
+      }
+      result.normalize();
+      return result;
+    }
+    // ordinal y: expand based on y's structure
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    // For ordinal y, add the ω*2 marker
+    // h20 is the diagonalization: y levels of ω*2 operations
+    // The result keeps y's ordinal structure and adds [1, 0, 2] as the ω*2 marker
+    result.array.push([1, 0, 2]);
+    result.normalize();
+    return result;
+  };
+  Q.aperioexpande = Q.apea = Q.h20 = function (x, y) {
+    return new MetaNum(x).aperioexpande(y);
+  };
+
+  P.inv_aperioexpande = P.i_apea = P.i20 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 0 && row[2] === 2 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 3 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_aperioexpande = Q.i_apea = Q.i20 = function (x, z) {
+    return new MetaNum(x).inv_aperioexpande(z);
+  };
+  
+  //ω*2+1 x{{{1}}}y
+  P.explode = P.expl = P.h21 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.clone();
+    if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
+    var base = x.aperioexpande(x);  // explode(x, 2)
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      if (y.eq(2)) return result;
+      var count = y.toNumber() - 2;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(3);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 1, 2]);
+    result.normalize();
+    return result;
+  };
+  Q.explode = Q.expl = Q.h21 = function (x, y) {
+    return new MetaNum(x).explode(y);
+  };
+
+  P.inv_explode = P.i_expl = P.i21 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 1 && row[2] === 2 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 3 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_explode = Q.i_expl = Q.i21 = function (x, z) {
+    return new MetaNum(x).inv_explode(z);
+  };
+
+  //ω*2+2 x{{{2}}}y
+  P.multiexplode = P.muel = P.h22 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.clone();
+    if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
+    var base = x.explode(x);  // multiexplode(x, 2)
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      if (y.eq(2)) return result;
+      var count = y.toNumber() - 2;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(4);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 2, 2]);
+    result.normalize();
+    return result;
+  };
+  Q.multiexplode = Q.muel = Q.h22 = function (x, y) {
+    return new MetaNum(x).multiexplode(y);
+  };
+
+  P.inv_multiexplode = P.i_muel = P.i22 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 2 && row[2] === 2 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 4 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_multiexplode = Q.i_muel = Q.i22 = function (x, z) {
+    return new MetaNum(x).inv_multiexplode(z);
+  };
+  
+  //ω*3 x{{{y}}}x
+  P.aperioexplode = P.apel = P.h30 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.explode(x);
+    if (y.eq(2)) return x.multiexplode(x);
+    var base = x.multiexplode(x);  // aperioexplode(x, 2)
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      var count = y.toNumber() - 2;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(5);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 0, 3]);
+    result.normalize();
+    return result;
+  };
+  Q.aperioexplode = Q.apel = Q.h30 = function (x, y) {
+    return new MetaNum(x).aperioexplode(y);
+  };
+
+  P.inv_aperioexplode = P.i_apel = P.i30 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 0 && row[2] === 3 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 5 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_aperioexplode = Q.i_apel = Q.i30 = function (x, z) {
+    return new MetaNum(x).inv_aperioexplode(z);
+  };
+  
+  //ω*3+1 x{{{{1}}}}y
+  P.detonate = P.deto = P.h31 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.clone();
+    if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
+    var base = x.aperioexplode(x);  // detonate(x, 2)
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      if (y.eq(2)) return result;
+      var count = y.toNumber() - 2;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(5);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 1, 3]);
+    result.normalize();
+    return result;
+  };
+  Q.detonate = Q.deto = Q.h31 = function (x, y) {
+    return new MetaNum(x).detonate(y);
+  };
+
+  P.inv_detonate = P.i_deto = P.i31 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 1 && row[2] === 3 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 5 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_detonate = Q.i_deto = Q.i31 = function (x, z) {
+    return new MetaNum(x).inv_detonate(z);
+  };
+  
+  //ω*4 x{{{{y}}}}x
+  P.aperiodetonate = P.apdt = P.h40 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.detonate(x);
+    var base = x.detonate(x);  // aperiodetonate(x, 1)
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      var count = y.toNumber() - 1;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(6);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 0, 4]);
+    result.normalize();
+    return result;
+  };
+  Q.aperiodetonate = Q.apdt = Q.h40 = function (x, y) {
+    return new MetaNum(x).aperiodetonate(y);
+  };
+
+  P.inv_aperiodetonate = P.i_apdt = P.i40 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 0 && row[2] === 4 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 6 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_aperiodetonate = Q.i_apdt = Q.i40 = function (x, z) {
+    return new MetaNum(x).inv_aperiodetonate(z);
+  };
+
+  //ω^2 (diagonalization at ω*y level)
+  P.aperionate = P.apeo = P.h100 =function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.aperiote(x);
+    if (y.eq(2)) return x.aperioexpande(x);
+    if (y.eq(3)) return x.aperioexplode(x);
+    var base = x.aperioexplode(x);
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      var count = y.toNumber() - 3;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(6);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 0, 0, 1]);
+    result.normalize();
+    return result;
+  };
+  Q.aperionate = Q.apeo = Q.h100 = function (x, y) {
+    return new MetaNum(x).aperionate(y);
+  };
+
+  P.inv_aperionate = P.i_apeo = P.i100 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 4 && row[1] === 0 && row[2] === 0 && row[3] === 1 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 6 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_aperionate = Q.i_apeo = Q.i100 = function (x, z) {
+    return new MetaNum(x).inv_aperionate(z);
+  };
+
+  //ω^2+1 (iterated aperionate)
+  P.megote = P.mego = P.h101 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.clone();
+    if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
+    var base = x.aperionate(x);  // megote(x, 2)
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      if (y.eq(2)) return result;
+      var count = y.toNumber() - 2;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(7);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 1, 0, 1]);
+    result.normalize();
+    return result;
+  };
+  Q.megote = Q.mego = Q.h101 = function (x, y) {
+    return new MetaNum(x).megote(y);
+  };
+
+  P.inv_megote = P.i_mego = P.i101 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 4 && row[1] === 1 && row[2] === 0 && row[3] === 1 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 7 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_megote = Q.i_mego = Q.i101 = function (x, z) {
+    return new MetaNum(x).inv_megote(z);
+  };
+
+  //ω^2+2 (iterates megote)
+  P.multimegote = P.mume = P.h102 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.clone();
+    if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
+    var base = x.megote(x);  // multimegote(x, 2)
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      if (y.eq(2)) return result;
+      var count = y.toNumber() - 2;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(8);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 2, 0, 1]);
+    result.normalize();
+    return result;
+  };
+  Q.multimegote = Q.mume = Q.h102 = function (x, y) {
+    return new MetaNum(x).multimegote(y);
+  };
+
+  P.inv_multimegote = P.i_mume = P.i102 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 4 && row[1] === 2 && row[2] === 0 && row[3] === 1 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 8 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_multimegote = Q.i_mume = Q.i102 = function (x, z) {
+    return new MetaNum(x).inv_multimegote(z);
+  };
+
+  // ω^2+ω (diagonalization at ω^2+y level)
+  P.aperimegote = P.apmg = P.h110 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.megote(x);
+    var base = x.megote(x);  // aperimegote(x, 1)
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      var count = y.toNumber() - 1;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(8);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 0, 1, 1]);
+    result.normalize();
+    return result;
+  };
+  Q.aperimegote = Q.apmg = Q.h110 = function (x, y) {
+    return new MetaNum(x).aperimegote(y);
+  };
+
+  P.inv_aperimegote = P.i_apmg = P.i110 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 4 && row[1] === 0 && row[2] === 1 && row[3] === 1 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 8 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_aperimegote = Q.i_apmg = Q.i110 = function (x, z) {
+    return new MetaNum(x).inv_aperimegote(z);
+  };
+
+  // megoexpande (ω^2+ω+1): iterates aperimegote
+  P.megoexpande = P.mgea = P.h111 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.clone();
+    if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
+    var base = x.aperimegote(x);  // megoexpande(x, 2)
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      if (y.eq(2)) return result;
+      var count = y.toNumber() - 2;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(8);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 1, 1, 1]);
+    result.normalize();
+    return result;
+  };
+  Q.megoexpande = Q.mgea = Q.h111 = function (x, y) {
+    return new MetaNum(x).megoexpande(y);
+  };
+
+  P.inv_megoexpande = P.i_mgea = P.i111 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 4 && row[1] === 1 && row[2] === 1 && row[3] === 1 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 8 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_megoexpande = Q.i_mgea = Q.i111 = function (x, z) {
+    return new MetaNum(x).inv_megoexpande(z);
+  };
+
+  //aperimegoexpande (ω^2+ω*2): diagonalize at ω^2+ω+y level
+  P.aperimegoexpande = P.apme = P.h120 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.megoexpande(x);
+    var base = x.megoexpande(x);  // aperimegoexpande(x, 1)
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      var count = y.toNumber() - 1;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(9);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 0, 2, 1]);
+    result.normalize();
+    return result;
+  };
+  Q.aperimegoexpande = Q.apme = Q.h120 = function (x, y) {
+    return new MetaNum(x).aperimegoexpande(y);
+  };
+
+  P.inv_aperimegoexpande = P.i_apme = P.i120 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 4 && row[1] === 0 && row[2] === 2 && row[3] === 1 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 9 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_aperimegoexpande = Q.i_apme = Q.i120 = function (x, z) {
+    return new MetaNum(x).inv_aperimegoexpande(z);
+  };
+
+
+  // megoaperionation (ω^2*2): diagonalization at ω^2+ω*y level
+  P.megoaperionation = P.mgao = P.h200 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.megote(x);
+    if (y.eq(2)) return x.aperimegote(x);
+    if (y.eq(3)) return x.megoexpande(x);
+    var base = x.megoexpande(x);  // megoaperionation(x, 3)
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      var count = y.toNumber() - 3;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(9);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 0, 0, 2]);
+    result.normalize();
+    return result;
+  };
+  Q.megoaperionation = Q.mgao = Q.h200 = function (x, y) {
+    return new MetaNum(x).megoaperionation(y);
+  };
+
+  P.inv_megoaperionation = P.i_mgao = P.i200 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 4 && row[1] === 0 && row[2] === 0 && row[3] === 2 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 9 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_megoaperionation = Q.i_mgao = Q.i200 = function (x, z) {
+    return new MetaNum(x).inv_megoaperionation(z);
+  };
+
+  // gigote (ω^2*2+1): iterates megoaperionation
+  P.gigote = P.gigo = P.h201 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.clone();
+    if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
+    var base = x.megoaperionation(x);  // gigote(x, 2)
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      if (y.eq(2)) return result;
+      var count = y.toNumber() - 2;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(9);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 1, 0, 2]);
+    result.normalize();
+    return result;
+  };
+  Q.gigote = Q.gigo = Q.h201 = function (x, y) {
+    return new MetaNum(x).gigote(y);
+  };
+
+  P.inv_gigote = P.i_gigo = P.i201 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 4 && row[1] === 1 && row[2] === 0 && row[3] === 2 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 9 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_gigote = Q.i_gigo = Q.i201 = function (x, z) {
+    return new MetaNum(x).inv_gigote(z);
+  };
+
+  //aperigigote (ω^2*2+ω): diag at ω^2*2+y level
+  P.aperigigote = P.apgg = P.h210 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.gigote(x);
+    var base = x.gigote(x);
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      var count = y.toNumber() - 1;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(9);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 0, 1, 2]);
+    result.normalize();
+    return result;
+  };
+  Q.aperigigote = Q.apgg = Q.h210 = function (x, y) {
+    return new MetaNum(x).aperigigote(y);
+  };
+
+  P.inv_aperigigote = P.i_apgg = P.i210 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 4 && row[1] === 0 && row[2] === 1 && row[3] === 2 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 9 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_aperigigote = Q.i_apgg = Q.i210 = function (x, z) {
+    return new MetaNum(x).inv_aperigigote(z);
+  };
+
+  //gigoaperionate (ω^2*3): diag at ω^2*2+ω*y level
+  P.gigoaperionate = P.ggap = P.h300 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.clone();
+    if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
+    var base = x.aperigigote(x);
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      if (y.eq(2)) return result;
+      var count = y.toNumber() - 2;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(9);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 0, 0, 3]);
+    result.normalize();
+    return result;
+  };
+  Q.gigoaperionate = Q.ggap = Q.h300 = function (x, y) {
+    return new MetaNum(x).gigoaperionate(y);
+  };
+
+  P.inv_gigoaperionate = P.i_ggap = P.i300 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 4 && row[1] === 0 && row[2] === 0 && row[3] === 3 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 9 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_gigoaperionate = Q.i_ggap = Q.i300 = function (x, z) {
+    return new MetaNum(x).inv_gigoaperionate(z);
+  };
+
+  // aperiatotion (ω^3): diagonalization of ω^2*y
+  P.aperiatotion = P.apat = P.h1000 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.aperionate(x);
+    if (y.eq(2)) return x.megoaperionation(x);
+    var base = x.megoaperionation(x);  // aperiatotion(x, 2)
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      var count = y.toNumber() - 2;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(10);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 0, 0, 0, 1]);
+    result.normalize();
+    return result;
+  };
+  Q.aperiatotion = Q.apat = Q.h1000 = function (x, y) {
+    return new MetaNum(x).aperiatotion(y);
+  };
+
+  P.inv_aperiatotion = P.i_apat = P.i1000 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 5 && row[1] === 0 && row[2] === 0 && row[3] === 0 && row[4] === 1 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 10 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_aperiatotion = Q.i_apat = Q.i1000 = function (x, z) {
+    return new MetaNum(x).inv_aperiatotion(z);
+  };
+
+  // powiainate (ω^3+1): iterates aperiatotion
+  P.powiainate = P.pwan = P.h1001 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.clone();
+    if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
+    var base = x.aperiatotion(x);  // powiainate(x, 2)
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      if (y.eq(2)) return result;
+      var count = y.toNumber() - 2;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(10);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 1, 0, 0, 1]);
+    result.normalize();
+    return result;
+  };
+  Q.powiainate = Q.pwan = Q.h1001 = function (x, y) {
+    return new MetaNum(x).powiainate(y);
+  };
+
+  P.inv_powiainate = P.i_pwan = P.i1001 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 5 && row[1] === 1 && row[2] === 0 && row[3] === 0 && row[4] === 1 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 10 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_powiainate = Q.i_pwan = Q.i1001 = function (x, z) {
+    return new MetaNum(x).inv_powiainate(z);
+  };
+
+  //expandainate (ω^3+ω): diagonalization at ω^3+y level
+  P.expandainate = P.epan = P.h1010 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.powiainate(x);
+    var base = x.powiainate(x);
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      var count = y.toNumber() - 1;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(10);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 0, 1, 0, 1]);
+    result.normalize();
+    return result;
+  };
+  Q.expandainate = Q.epan = Q.h1010 = function (x, y) {
+    return new MetaNum(x).expandainate(y);
+  };
+
+  P.inv_expandainate = P.i_epan = P.i1010 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 5 && row[1] === 0 && row[2] === 1 && row[3] === 0 && row[4] === 1 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 10 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_expandainate = Q.i_epan = Q.i1010 = function (x, z) {
+    return new MetaNum(x).inv_expandainate(z);
+  };
+
+  //megodainate (ω^3+ω^2): diagonalization at ω^3+ω*y level
+  P.megodainate = P.mgan = P.h1100 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.clone();
+    if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
+    var base = x.expandainate(x);
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      if (y.eq(2)) return result;
+      var count = y.toNumber() - 2;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(10);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 0, 0, 1, 1]);
+    result.normalize();
+    return result;
+  };
+  Q.megodainate = Q.mgan = Q.h1100 = function (x, y) {
+    return new MetaNum(x).megodainate(y);
+  };
+
+  P.inv_megodainate = P.i_mgan = P.i1100 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 5 && row[1] === 0 && row[2] === 0 && row[3] === 1 && row[4] === 1 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 10 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_megodainate = Q.i_mgan = Q.i1100 = function (x, z) {
+    return new MetaNum(x).inv_megodainate(z);
+  };
+
+  //powiairate (ω^3*2): diagonalization at ω^3+ω^2*y level
+  P.powiairate = P.pwar = P.h2000 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.clone();
+    if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
+    var base = x.megodainate(x);
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      if (y.eq(2)) return result;
+      var count = y.toNumber() - 2;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(10);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 0, 0, 0, 2]);
+    result.normalize();
+    return result;
+  };
+  Q.powiairate = Q.pwar = Q.h2000 = function (x, y) {
+    return new MetaNum(x).powiairate(y);
+  };
+
+  P.inv_powiairate = P.i_pwar = P.i2000 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 5 && row[1] === 0 && row[2] === 0 && row[3] === 0 && row[4] === 2 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 10 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_powiairate = Q.i_pwar = Q.i2000 = function (x, z) {
+    return new MetaNum(x).inv_powiairate(z);
+  };
+
+  //aperioguate (ω^4): diagonalization at ω^3*y level
+  P.aperioguate = P.apgu = P.h10000 = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.aperiatotion(x);
+    if (y.eq(2)) return x.powiairate(x);
+    var base = x.powiairate(x);
+    if (y.layer === 0 && y.array.length <= 1) {
+      var result = base.clone();
+      var count = y.toNumber() - 2;
+      if (count > 0) {
+        result.layer = 0;
+        result.array = [base.array[0].slice()];
+        var cl = MetaNum.getCantorLevel(11);
+        var maxVal = (cl >= 2) ? (y.toNumber() - 1) : count;
+        var ordRows = MetaNum.expandOrdinals(cl, maxVal);
+        for (var i = 0; i < ordRows.length; i++) {
+          result.array.push(ordRows[i]);
+        }
+        result.normalize();
+      }
+      return result;
+    }
+    var result = y.clone();
+    result.array[0] = base.array[0].slice();
+    result.layer = 0;
+    result.array.push([1, 0, 0, 0, 0, 1]);
+    result.normalize();
+    return result;
+  };
+  Q.aperioguate = Q.apgu = Q.h10000 = function (x, y) {
+    return new MetaNum(x).aperioguate(y);
+  };
+
+  P.inv_aperioguate = P.i_apgu = P.i10000 = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 6 && row[1] === 0 && row[2] === 0 && row[3] === 0 && row[4] === 0 && row[5] === 1 && row[0] === 1) {
+          result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[1] === 11 && row[2] === 1 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_aperioguate = Q.i_apgu = Q.i10000 = function (x, z) {
+    return new MetaNum(x).inv_aperioguate(z);
+  };
+
+  // iter (ω^ω): diagonalizes ω^x operations
+  // k <= maxCols-2: layer 0, multi-index; k >= maxCols-1: layer 1
+  P.iter = P.hww = function (y) {
+    var x = this.clone();
+    y = new MetaNum(y);
+    if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
+    if (y.eq(MetaNum.ONE)) return x.clone();
+    if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
+    
+    if (y.layer === 0 && y.array.length <= 1) {
+      var yn = y.toNumber();
+      var maxLevel = MetaNum.maxCols - 1;
+      if (yn < maxLevel) {
+        // y fits within ordinal levels: create ω^y at layer 0
+        // Multi-index format: [1, 0, 0, ..., 0, 1] with yn zeros
+        var result = x.clone();
+        var row = [1];
+        for (var i = 0; i < yn; i++) row.push(0);
+        row.push(1);
+        result.layer = 0;
+        result.array.push(row);
+        result.normalize();
+        return result;
+      } else {
+        // y >= maxLevel: promote to layer 1, compact format
+        var result = x.clone();
+        result.array.push([1, yn, 1]);
+        result.normalize();
+        return result;
+      }
+    }
+    
+    // y is ordinal: iter on ordinal
+    // Promote: absorb y's ordinal rows into r0, add iter marker
+    // Layer promotion consumes one level: skip the first value
+    var result = y.clone();
+    var newR0 = x.array[0].slice();
+    // Absorb y's ordinal rows into r0 (skip count and first value)
+    for (var ir = 1; ir < y.array.length; ir++) {
+      var yrow = y.array[ir];
+      // Start from index 2 to skip count and first ordinal value
+      for (var jc = 2; jc < yrow.length; jc++) {
+        newR0.push(yrow[jc]);
+      }
+    }
+    result.array[0] = newR0;
+    result.array = [newR0];
+    // Add iter's own ordinal marker
+    result.array.push([1, 0, 1]);
+    result.layer = y.layer + 1;
+    result.normalize();
+    return result;
+  };
+  Q.iter = Q.hww = function (x, y) {
+    return new MetaNum(x).iter(y);
+  };
+
+  P.inv_iter = P.iww = function (z) {
+    var x = this.clone();
+    z = new MetaNum(z);
+    if (x.isNaN() || z.isNaN()) return MetaNum.NaN.clone();
+    if (z.array.length >= 2) {
+      var result = z.clone();
+      // Find the highest ordinal row and decrement/remove it
+      for (var i = result.array.length - 1; i >= 1; i--) {
+        var row = result.array[i];
+        if (row.length >= 3 && row[0] > 0) {
+          row[0]--;
+          if (row[0] <= 0) result.array.splice(i, 1);
+          result.normalize();
+          if (result.array.length <= 1) result.layer = 0;
+          return result;
+        }
+      }
+      return result;
+    }
+    return z;
+  };
+  Q.inv_iter = Q.iww = function (x, z) {
+    return new MetaNum(x).inv_iter(z);
+  };
+
+  /* hyper operations up to epsilon 0
+  1. itermult (ω^ω+1) = hw01
+  2. cuboiter (ω^ω*2) = hwx2
+  3. expoiter (ω^(ω+1)) = hwa1
+  4. trioterate (ω^(ω*2)) = hwm2
+  5. trixxate (ω^(ω^2)) = hwp2
+  6. aperixxate (ω^(ω^ω)) = hwpw
+  7. epsilonate (ω↑↑ω) = epsl
+  */
+
+
+  P.choose = function (other) {
+    var x = this.clone();
+    other = new MetaNum(other);
+    if (x.isNaN() || other.isNaN()) return MetaNum.NaN.clone();
+    if (x.sign === -1 || x.sign === -2 || other.sign === -1 || other.sign === -2) return MetaNum.ZERO.clone();
+    if (other.eq(MetaNum.ZERO) || x.eq(other)) return MetaNum.ONE.clone();
+    if (x.lt(other)) return MetaNum.ZERO.clone();
+    if (isSimple(x) && isSimple(other) && Number.isInteger(x.array[0][0]) && Number.isInteger(other.array[0][0]) &&
+        x.array[0][0] >= 0 && other.array[0][0] >= 0 && x.array[0][0] <= 1000 && other.array[0][0] <= 1000) {
+      var n = x.array[0][0];
+      var k = other.array[0][0];
+      if (k > n - k) k = n - k;
+      var result = 1;
+      for (var i = 0; i < k; i++) result = result * (n - i) / (i + 1);
+      return new MetaNum(result);
+    }
+    return x.fact().div(other.fact().mul(x.sub(other).fact()));
+  };
+  Q.choose = function (x, y) {
+    return new MetaNum(x).choose(y);
+  };
+
+  P.toNumber = function () {
+    if (this.sign === -1) return -this.abs().toNumber();
+    if (this.sign === -2) return -this.abs().toNumber();
+    if (this.isNaN()) return NaN;
+    if (this.isInfinite()) return Infinity;
+    if (isSmall(this)) {
+      // Small value: very close to 0
+      if (this.layer > 0) return 0;
+      if (this.array.length > 1) return 0;
+      var r0 = this.array[0];
+      if (r0.length === 1) {
+        // Simple small value: 1/r0[0]
+        return 1 / r0[0];
+      }
+      return 0;
+    }
+    if (this.layer > 0) return Infinity;
+    if (this.array.length > 1) return Infinity;
+    var r0 = this.array[0];
+    if (r0.length === 1) return r0[0];
+    return Infinity;
+  };
+  Q.toNumber = function (x) {
+    return new MetaNum(x).toNumber();
+  };
+
+  P.valueOf = function () {
+    return this.toString();
+  };
+
+  P.toString = function () {
+    function formatCount(pattern, count) {
+      return count >= 4 ? pattern + "^" + count : pattern.repeat(count);
+    }
+    function formatFiniteOps(r0) {
+      var parts = [];
+      for (var i = r0.length - 1; i >= 1; i--) {
+        if (r0[i] > 0) {
+          var letter = String.fromCharCode(68 + i);
+          var token = formatCount(letter, r0[i]);
+          parts.push(token);
+        }
+      }
+      if (parts.length === 0) return "";
+      var hasPower = false;
+      for (var j = 0; j < parts.length; j++) {
+        if (parts[j].indexOf("^") !== -1) { hasPower = true; break; }
+      }
+      var sep = hasPower ? " " : "";
+      return parts.join(sep) + (hasPower ? " " : "");
+    }
+    // Helper: format a MetaNum as scientific notation (AeB)
+    function formatExponent(num) {
+      if (isSimple(num)) {
+        var val = num.toNumber();
+        if (isFinite(val) && val !== 0) {
+          return val.toExponential(6).replace(/\+/g, '');
+        }
+      }
+      if (num.layer === 0 && num.array.length === 1) {
+        var r0 = num.array[0];
+        if (r0.length === 2) {
+          // E notation: array is [mantissa, 1], value = 10^mantissa
+          var m = r0[0];
+          if (Number.isInteger(m)) {
+            return "1E" + m;
+          }
+          var mant = Math.pow(10, m % 1);
+          var exp = Math.floor(m);
+          return mant.toPrecision(6).replace(/0+$/, '').replace(/\.$/, '') + "E" + exp;
+        }
+      }
+      // Fallback: use native toString
+      return num.toString();
+    }
+    if (this.isNaN()) return "NaN";
+    if (this.isInfinite()) return this.sign === -1 || this.sign === -2 ? "-Infinity" : "Infinity";
+
+    if (this.eq(MetaNum.ZERO)) return "0";
+
+    if (this.sign === -1 || this.sign === -2) return "-" + this.abs().toString();
+
+    if (isSmall(this)) {
+      // Three tiers of small value display
+      var recip = this.clone();
+      recip.sign = 1;  // Get the reciprocal (large number)
+      var mag = recip.log10();  // log10(reciprocal) = magnitude exponent
+      var maxSf = new MetaNum(MAX_SAFE_INTEGER);
+      var eMaxSf = MetaNum.pow(MetaNum.TEN, maxSf);
+      
+      // Tier 1: |x| > 1e-MAX_SAFE_INTEGER → -log10(|x|) < MAX_SAFE_INTEGER → mag < MAX_SAFE_INTEGER
+      if (mag.lt(maxSf)) {
+        var expVal = mag.toNumber();
+        if (Number.isFinite(expVal)) {
+          if (Number.isInteger(expVal)) {
+            return "1E-" + String(Math.round(expVal));
+          }
+          // Non-integer: normalize so mantissa is in [1, 10)
+          var frac = expVal - Math.floor(expVal);
+          var mantissa = Math.pow(10, 1 - frac);
+          var intExp = Math.floor(expVal) + 1;
+          var mantStr = mantissa.toPrecision(6).replace(/0+$/, '').replace(/\.$/, '');
+          return mantStr + "E-" + intExp;
+        }
+      }
+      
+      // Tier 2: MAX_SAFE_INTEGER ≤ mag < 10^MAX_SAFE_INTEGER
+      if (!mag.isInfinite() && mag.gte(maxSf) && mag.lt(eMaxSf)) {
+        // Format mag in scientific notation for the "e-AeB" format
+        var expStr = formatExponent(mag);
+        return "E-" + expStr;
+      }
+      
+      // Tier 3: mag ≥ 10^MAX_SAFE_INTEGER → display as reciprocal
+      if (recip.layer === 0 && recip.array.length === 1 && recip.array[0].length === 1) {
+        return recip.array[0][0] + "⁻¹";
+      }
+      return recip.toString() + "⁻¹";
+    }
+
+    if (this.layer > 0) {
+      var LAYER_SYMBOLS = {1: '!', 2: '@', 3: '#', 4: '$', 5: '%', 6: '&', 7: '~', 8: '<', 9: '>', 10: '?'};
+      var sym = this.layer <= 10 ? LAYER_SYMBOLS[this.layer] : null;
+      
+      // Layer >= 11: use {m}ε{n} format
+      if (this.layer >= 11) {
+        var epsVal;
+        var epsIsSpecial = false;
+        
+        // Check for special case: r0 stores ordinal level directly [coeff, m] with 99 <= m <= MAX_SAFE_INTEGER
+        if (this.array.length === 1 && this.array[0].length === 2 &&
+            this.array[0][1] >= 99 && this.array[0][1] <= MAX_SAFE_INTEGER) {
+          epsVal = this.array[0][1];
+          epsIsSpecial = true;
+        } else if (this.array.length >= 2) {
+          // Normal case: ordinal level from last row structure
+          // The ε value is the ordinal exponent (number of ordinal params = lastRow.length - 2)
+          var lastRow = this.array[this.array.length - 1];
+          epsVal = lastRow[0] || 1;
+        } else {
+          epsVal = this.array[0][0] || 1;
+        }
+        
+        if (epsIsSpecial) {
+          return "{" + epsVal + "}\u03B5{" + (this.layer - 1) + "}";
+        }
+        // Normal case: bare format mεn for simple values
+        var epsStr;
+        if (Number.isInteger(epsVal) && epsVal >= 1 && epsVal <= 1e15) {
+          epsStr = String(epsVal);
+        } else {
+          epsStr = "{" + epsVal + "}";
+        }
+        // If there's more structure beyond the simple ε format, include array notation
+        if (this.array.length > 2 || (this.array.length === 2 && this.array[0].length > 1)) {
+          epsStr += " [" + this.array[0].join(",") + "]";
+          for (var i = 1; i < this.array.length - 1; i++) {
+            epsStr += " [" + this.array[i].join(",") + "]";
+          }
+        }
+        return epsStr + "\u03B5" + this.layer;
+      }
+      
+      // Layers 1-10: check for special ε compact format first
+      // Special case: r0 stores ordinal level directly [coeff, m] with 99 <= m <= MAX_SAFE_INTEGER
+      if (sym && this.array.length === 1 && this.array[0].length === 2 &&
+          this.array[0][1] >= 99 && this.array[0][1] <= Number.MAX_SAFE_INTEGER) {
+        return "{" + this.array[0][1] + "}\u03B5{" + (this.layer - 1) + "}";
+      }
+
+      // Layers 1-10: try letter notation
+      if (sym && this.array.length >= 2) {
+        var ordTokens = [];
+        var validLetter = true;
+        
+        for (var i = this.array.length - 1; i >= 1; i--) {
+          var row = this.array[i];
+          if (row.length < 3) { validLetter = false; break; }
+          var diag = row[row.length - 1];
+          var countVals = row[0];
+          var vals = row.slice(1, row.length - 1);
+          var n = vals.length;
+          
+          if (diag < 1 || diag > 26) { validLetter = false; break; }
+          
+          var U = String.fromCharCode(64 + diag);
+          var allZero = true;
+          var anyLarge = false;
+          var largeVal = -1;
+          for (var j = 0; j < n; j++) {
+            if (vals[j] > 25) { anyLarge = true; largeVal = vals[j]; }
+            if (vals[j] !== 0) allZero = false;
+          }
+          
+          var token;
+          if (allZero) {
+            token = n > 26 ? U + "a" + n : U + "a".repeat(n);
+          } else if (anyLarge && n === 1) {
+            // Compact format: single large value
+            token = U + "a" + largeVal;
+          } else {
+            var lower = "";
+            var ok = true;
+            for (var j = n - 1; j >= 0; j--) {
+              if (vals[j] > 25) { ok = false; break; }
+              lower += String.fromCharCode(97 + vals[j]);
+            }
+            if (!ok) { validLetter = false; break; }
+            token = U + lower;
+          }
+          if (countVals > 1) {
+            token = countVals >= 4 ? token + "^" + countVals : token.repeat(countVals);
+          }
+          ordTokens.push(token);
+        }
+        
+        if (validLetter && ordTokens.length > 0) {
+          var finOps = formatFiniteOps(this.array[0]);
+          var baseStr = "";
+          if (this.array[0].length === 1) {
+            baseStr = String(this.array[0][0]);
+          } else if (finOps !== "" && this.array[0].length >= 1 && this.array[0][0] > 0) {
+            baseStr = String(this.array[0][0]);
+          }
+          // Always include layer symbol for layers 1-10
+          if (this.layer >= 1 && finOps === "" && baseStr !== "") {
+            return sym + ordTokens.join("") + baseStr;
+          }
+          return sym + ordTokens.join("") + (finOps ? finOps : "") + baseStr;
+        }
+      }
+      
+      // Ultimate fallback: array notation with layer symbol
+      var s = (this.layer <= 10 ? LAYER_SYMBOLS[this.layer] || ("!".repeat(this.layer)) : "E" + this.layer) + " ";
+      for (var i = 0; i < this.array.length; i++) {
+        if (i > 0) s += " ";
+        s += "[" + this.array[i].join(",") + "]";
+      }
+      return s;
+    }
+
+    if (this.array.length <= 1) {
+      var r0 = this.array[0];
+
+      if (r0.length === 1) return String(r0[0]);
+
+      if (r0.length >= 24) {
+        var highestIdx = -1;
+        for (var j = r0.length - 1; j >= 1; j--) {
+          if (r0[j] && r0[j] !== 0) {
+            highestIdx = j;
+            break;
+          }
+        }
+        if (highestIdx !== -1) {
+          return r0[highestIdx] + "Aa" + highestIdx;
+        }
+      }
+
+      var result = "";
+      for (var j = r0.length - 1; j >= 1; j--) {
+        if (!r0[j] || r0[j] === 0) continue;
+        var letter = String.fromCharCode(68 + j);
+        if (r0[j] > 3) {
+          result += letter + "^" + r0[j] + " ";
+        } else {
+          result += letter.repeat(r0[j]);
+        }
+      }
+      result += decimalPlaces(r0[0], 6);
+      return result;
+    }
+
+    // Layer 0 with ordinal rows: try letter notation
+    if (this.array.length > 1) {
+      // Check if all ordinal rows are 2-element [count, value] (h10 ω-level format)
+      var allTwoElement = true;
+      for (var i = 1; i < this.array.length; i++) {
+        if (this.array[i].length !== 2) { allTwoElement = false; break; }
+      }
+      if (allTwoElement) {
+        // Check for truncation pattern: array[0] = [10] placeholder
+        var isTruncated = this.array[0].length === 1 && this.array[0][0] === 10;
+        if (isTruncated) {
+          // Show only the last row: count Aa value
+          var lastRow = this.array[this.array.length - 1];
+          return lastRow[0] + "Aa" + lastRow[1];
+        }
+        // Non-truncated: show all rows
+        var tokens = [];
+        for (var i = this.array.length - 1; i >= 1; i--) {
+          var row = this.array[i];
+          var tok = row[0] > 1 ? row[0] + "Aa" + row[1] : "Aa" + row[1];
+          tokens.push(tok);
+        }
+        var finOps = formatFiniteOps(this.array[0]);
+        var baseNum = decimalPlaces(this.array[0][0], 6);
+        return tokens.join("") + (finOps ? finOps : "") + baseNum;
+      }
+      
+      var ordTokens = [];
+      var validLetter = true;
+      var useExclaim = false;
+      
+      for (var i = this.array.length - 1; i >= 1; i--) {
+        var row = this.array[i];
+        if (row.length < 3) { validLetter = false; break; }
+        var diag = row[row.length - 1];
+        var countVals = row[0];
+        var vals = row.slice(1, row.length - 1);
+        var n = vals.length;
+        
+        if (diag < 1 || diag > 26) { validLetter = false; break; }
+        
+        var U = String.fromCharCode(64 + diag);
+        var allZero = true;
+        var anyLarge = false;
+        for (var j = 0; j < n; j++) {
+          if (vals[j] > 25) { anyLarge = true; }
+          if (vals[j] !== 0) allZero = false;
+        }
+        if (anyLarge) { validLetter = false; break; }
+        if (!validLetter) break;
+        
+        var token;
+        if (allZero) {
+          if (n > 26) {
+            useExclaim = true;
+            token = U + "a" + n;
+          } else {
+            token = U + "a".repeat(n);
+          }
+        } else {
+          var lower = "";
+          for (var j = n - 1; j >= 0; j--) {
+            lower += String.fromCharCode(97 + vals[j]);
+          }
+          token = U + lower;
+        }
+        if (countVals > 1) {
+          token = countVals >= 4 ? token + "^" + countVals : token.repeat(countVals);
+        }
+        ordTokens.push(token);
+      }
+      
+      if (validLetter) {
+        var finOps = formatFiniteOps(this.array[0]);
+        var prefix = useExclaim ? "!" : "";
+        var baseNum = useExclaim ? "" : decimalPlaces(this.array[0][0], 6);
+        return prefix + ordTokens.join("") + (finOps ? finOps : "") + baseNum;
+      }
+    }
+
+    if (this.array.length === 2 &&
+        this.array[0].length === 1 && this.array[0][0] === 10 &&
+        this.array[1].length === 2) {
+      return this.array[1][0] + "Aa" + this.array[1][1];
+    }
+
+    var multiResult = "";
+    for (var i = 0; i < this.array.length; i++) {
+      if (i > 0) multiResult += " ";
+      multiResult += "[" + this.array[i].join(",") + "]";
+    }
+    return multiResult;
+  };
+
+  P.toJSON = function () {
+    if (MetaNum.serializeMode === 0) {
+      return {
+        sign: this.sign,
+        array: deepCloneArray(this.array),
+        layer: this.layer
+      };
+    } else {
+      return this.toString();
+    }
+  };
+
+  P.toStringWithDecimalPlaces = function (places) {
+    if (this.sign === -1 || this.sign === -2) return "-" + this.abs().toStringWithDecimalPlaces(places);
+    if (this.isNaN()) return "NaN";
+    if (this.isInfinite()) return "Infinity";
+    if (isSimple(this)) {
+      var v = decimalPlaces(this.array[0][0], places);
+      if (Number.isFinite(v)) return v.toString();
+    }
+    return this.toString();
+  };
+
+  P.toExponential = function (places) {
+    if (this.sign === -1 || this.sign === -2) return "-" + this.abs().toExponential(places);
+    if (this.isNaN()) return "NaN";
+    if (this.isInfinite()) return "Infinity";
+    if (isSimple(this)) return this.toNumber().toExponential(places);
+    return this.toString();
+  };
+
+  P.toFixed = function (places) {
+    if (this.sign === -1 || this.sign === -2) return "-" + this.abs().toFixed(places);
+    if (this.isNaN()) return "NaN";
+    if (this.isInfinite()) return "Infinity";
+    if (isSimple(this)) return this.toNumber().toFixed(places);
+    return this.toString();
+  };
+
+  P.toPrecision = function (places) {
+    if (this.sign === -1 || this.sign === -2) return "-" + this.abs().toPrecision(places);
+    if (this.isNaN()) return "NaN";
+    if (this.isInfinite()) return "Infinity";
+    if (isSimple(this)) return this.toNumber().toPrecision(places);
+    return this.toString();
+  };
+
+  P.toHyperE = function () {
+    if (this.sign === -1 || this.sign === -2) return "-" + this.abs().toHyperE();
+    if (this.isNaN()) return "NaN";
+    if (this.isInfinite()) return "Infinity";
+    if (isSimple(this)) {
+      var v = this.array[0][0];
+      if (v < 10) return String(v);
+      return "E" + Math.log10(v).toFixed(6);
+    }
+    if (this.layer > 0) return "E" + this.layer + "#" + this.toString();
+    if (this.array.length === 1 && this.array[0].length >= 2) {
+      var s = "E";
+      for (var i = 1; i < this.array[0].length; i++) s += "#";
+      s += String(this.array[0][0]);
+      return s;
+    }
+    return this.toString();
+  };
+
+  Q.fromNumber = function (input) {
+    if (typeof input !== "number") throw Error(invalidArgument + "Expected Number");
+    var x = new MetaNum();
+    x.array = [[Math.abs(input)]];
+    x.sign = input < 0 ? -1 : 1;
+    x.layer = 0;
+    return x.normalize();
+  };
+
+  Q.fromArray = function (array, sign, layer) {
+    if (!Array.isArray(array)) throw Error(invalidArgument + "Expected Array");
+    var x = new MetaNum();
+    if (array.length > 0 && !Array.isArray(array[0])) {
+      x.array = [array.slice(0)];
+    } else {
+      x.array = deepCloneArray(array);
+    }
+    if (typeof sign === "number") x.sign = sign < 0 ? -1 : 1;
+    else x.sign = 1;
+    if (typeof layer === "number" && isFinite(layer) && layer >= 0) x.layer = Math.floor(layer);
+    else x.layer = computeLayer(x.array);
+    return x.normalize();
+  };
+
+  Q.fromObject = function (input) {
+    if (typeof input !== "object") throw Error(invalidArgument + "Expected Object");
+    if (input === null) return MetaNum.ZERO.clone();
+    if (Array.isArray(input)) return MetaNum.fromArray(input);
+    if (input instanceof MetaNum) return new MetaNum(input);
+    if (!(input.array instanceof Array)) throw Error(invalidArgument + "Expected that property 'array' exists");
+    var x = new MetaNum();
+    x.array = deepCloneArray(input.array);
+    x.sign = typeof input.sign === "number" ? (input.sign < 0 ? -1 : 1) : 1;
+    x.layer = typeof input.layer === "number" && isFinite(input.layer) && input.layer >= 0 ? Math.floor(input.layer) : 0;
+    return x.normalize();
+  };
+
+  Q.fromJSON = function (input) {
+    if (typeof input === "object") return MetaNum.fromObject(input);
+    if (typeof input !== "string") throw Error(invalidArgument + "Expected String");
+    var parsedObject;
+    try {
+      parsedObject = JSON.parse(input);
+    } catch (e) {
+      throw Error(invalidArgument + "Invalid JSON string");
+    }
+    return MetaNum.fromObject(parsedObject);
+  };
+
+  Q.hyper = function (n, a, b) {
+    if (n === undefined) n = 2;
+    n = new MetaNum(n);
+    a = new MetaNum(a);
+    b = new MetaNum(b);
+    if (n.isNaN() || a.isNaN() || b.isNaN()) return MetaNum.NaN.clone();
+    if (n.eq(MetaNum.ZERO)) return b.add(MetaNum.ONE);
+    if (n.eq(MetaNum.ONE)) return a.add(b);
+    if (n.eq(2)) return a.mul(b);
+    if (n.eq(3)) return a.pow(b);
+    if (n.eq(4)) return a.tetr(b);
+    if (n.eq(5)) return a.pent(b);
+    return a.arrow(b, n.sub(1));
+  };
+
+  Q.affordGeometricSeries = function (resourcesAvailable, priceStart, priceRatio, currentOwned) {
+    resourcesAvailable = new MetaNum(resourcesAvailable);
+    priceStart = new MetaNum(priceStart);
+    priceRatio = new MetaNum(priceRatio);
+    currentOwned = new MetaNum(currentOwned);
+    return priceStart.eq(new MetaNum(1))
+      ? resourcesAvailable.add(new MetaNum(1)).floor()
+      : MetaNum.ONE;
+  };
+
+  Q.affordArithmeticSeries = function (resourcesAvailable, priceStart, priceAdd, currentOwned) {
+    resourcesAvailable = new MetaNum(resourcesAvailable);
+    priceStart = new MetaNum(priceStart);
+    priceAdd = new MetaNum(priceAdd);
+    currentOwned = new MetaNum(currentOwned);
+    if (priceAdd.eq(MetaNum.ZERO)) return resourcesAvailable.div(priceStart).floor();
+    var a = priceAdd;
+    var b = priceStart.mul(2).sub(priceAdd);
+    var c = priceStart.sub(priceAdd).sub(resourcesAvailable.mul(2)).add(a);
+    return b.neg().add(b.pow(2).sub(a.mul(c).mul(4)).sqrt()).div(a.mul(2)).floor();
+  };
+
+  Q.sumGeometricSeries = function (numItems, start, ratio, numItemsStart) {
+    if (numItemsStart === undefined) numItemsStart = 0;
+    numItems = new MetaNum(numItems);
+    start = new MetaNum(start);
+    ratio = new MetaNum(ratio);
+    numItemsStart = new MetaNum(numItemsStart);
+    if (numItems.lt(numItemsStart)) return MetaNum.ZERO.clone();
+    return start.mul(MetaNum.ONE.sub(ratio.pow(numItems.sub(numItemsStart).add(MetaNum.ONE))))
+      .div(MetaNum.ONE.sub(ratio));
+  };
+
+  Q.sumArithmeticSeries = function (numItems, start, add, numItemsStart) {
+    if (numItemsStart === undefined) numItemsStart = 0;
+    numItems = new MetaNum(numItems);
+    start = new MetaNum(start);
+    add = new MetaNum(add);
+    numItemsStart = new MetaNum(numItemsStart);
+    if (numItems.lt(numItemsStart)) return MetaNum.ZERO.clone();
+    var n = numItems.sub(numItemsStart).add(MetaNum.ONE);
+    var last = start.add(add.mul(n.sub(MetaNum.ONE)));
+    return n.mul(start.add(last)).div(new MetaNum(2));
+  };
+
+  Q.choose = function (x, y) {
+    return new MetaNum(x).choose(y);
+  };
+
+  Q.fromBigInt = function (input) {
+    if (typeof BigInt === "undefined") throw Error(metaNumError + "BigInt is not supported in current environment");
+    if (typeof input === "bigint") {
+      if (input >= BigInt(0) && input <= BigInt(MAX_SAFE_INTEGER)) {
+        return new MetaNum(Number(input));
+      }
+      var inputStr = input.toString();
+      var inputLen = inputStr.length;
+      if (inputLen <= LONG_STRING_MIN_LENGTH) {
+        return new MetaNum(Number(inputStr));
+      }
+      var x = new MetaNum();
+      x.array = [[inputLen - 1 + log10LongString(inputStr)]];
+      x.sign = 1;
+      x.layer = 0;
+      return x.normalize();
+    } else {
+      throw Error(invalidArgument + "Expected BigInt");
+    }
+  };
+
+  Q.fromHyperE = function (input) {
+    if (typeof input !== "string") throw Error(invalidArgument + "Expected String");
+    var s = input.trim();
+    var negateIt = false;
+    if (s[0] === "-") {
+      negateIt = true;
+      s = s.substring(1).trim();
+    }
+    if (s === "NaN" || s === "Infinity") {
+      var x = new MetaNum();
+      x.array = [[s === "NaN" ? NaN : Infinity]];
+      x.sign = negateIt ? -1 : 1;
+      return x;
+    }
+    var count = 0;
+    while (s[0] === "E") {
+      count++;
+      s = s.substring(1).trim();
+      if (s[0] === "#") {
+        s = s.substring(1);
+      }
+    }
+    if (count === 0) {
+      return MetaNum.fromString((negateIt ? "-" : "") + s);
+    }
+    var x = new MetaNum();
+    if (count === 1) {
+      x.array = [[Math.pow(10, Number(s))]];
+    } else {
+      x.array = [[Number(s)]];
+      for (var i = 1; i < count; i++) x.array[0].push(i === count - 1 ? 1 : 0);
+    }
+    x.sign = negateIt ? -1 : 1;
+    x.layer = 0;
+    return x.normalize();
+  };
+
+  Q.fromString = function (input) {
+    if (typeof input !== "string") throw Error(invalidArgument + "Expected String");
+
+    try {
+      var parsed = JSON.parse(input);
+      if (parsed && typeof parsed === "object" && parsed.array) {
+        return MetaNum.fromJSON(parsed);
+      }
+    } catch (e) {}
+
+    var x = new MetaNum();
+    x.array = [[0]];
+    x.sign = 1;
+    x.layer = 0;
+
+    var s = input.trim();
+    if (s === "" || s === "0") {
+      return x;
+    }
+
+    var negateIt = false;
+    if (s[0] === "-" || s[0] === "+") {
+      var signMatch = s.match(/^[-\+]+/);
+      var signs = signMatch[0];
+      negateIt = (signs.match(/-/g) || []).length % 2 === 1;
+      s = s.substring(signMatch[0].length).trim();
+    }
+
+    if (s === "NaN") {
+      x.array = [[NaN]];
+      return x;
+    }
+    if (s === "Infinity") {
+      x.array = [[Infinity]];
+      x.sign = negateIt ? -1 : 1;
+      return x;
+    }
+
+    var layerMatch = s.match(/^\u03C9\^(\d+)\s*/);
+    if (layerMatch) {
+      x.layer = parseInt(layerMatch[1], 10);
+      s = s.substring(layerMatch[0].length).trim();
+    }
+
+    // Parse {m}ε{n} format - new rule: layer = n-1, ordinal = [1, 0_repeated_m, 1], r0 defaults to 10
+    // If m >= maxCols-1, row would exceed maxCols, so lift: array=[[10],[1,m]], layer=n
+    var epsMatch = s.match(/^\{(\d+(?:\.\d+)?)\}\u03B5\{(\d+)\}\s*/);
+    if (epsMatch) {
+      var epsN = parseInt(epsMatch[2], 10);
+      var epsM = Math.floor(Number(epsMatch[1]));
+      s = s.substring(epsMatch[0].length).trim();
+      if (epsM < 1 || epsN < 1) {
+        x.array = [[0]];
+        if (negateIt) x.sign = -1;
+        return x;
+      }
+      if (epsM >= MetaNum.maxCols - 1) {
+        // m >= 99: row [1, 0_m, 1] exceeds maxCols, lift one layer
+        x.layer = epsN;
+        x.array[0] = [10];
+        x.array.push([1, epsM]);
+      } else {
+        x.layer = epsN - 1;
+        x.array[0] = [10];
+        // Build row [1, 0_repeated_epsM, 1]
+        var epsRow = [1];
+        for (var ei = 0; ei < epsM; ei++) epsRow.push(0);
+        epsRow.push(1);
+        x.array.push(epsRow);
+      }
+      if (negateIt) x.sign = -1;
+      // De-layer: Aa form ([*,0,1]) with small r0, reduce layer by 1
+      if (x.layer > 0 && x.array.length >= 2) {
+        var lastRow = x.array[x.array.length - 1];
+        if (lastRow.length === 3 && lastRow[1] === 0 && lastRow[lastRow.length - 1] === 1 &&
+            x.array[0].length === 1 && x.array[0][0] >= 0 && x.array[0][0] <= MetaNum.maxCols - 2) {
+          var baseVal = x.array[0][0];
+          lastRow = [lastRow[0]];
+          for (var di = 0; di < baseVal; di++) lastRow.push(0);
+          lastRow.push(1);
+          x.array[x.array.length - 1] = lastRow;
+          x.layer--;
+        }
+      }
+      return x.normalize();
+    }
+
+    // Parse mεn format without braces - same rule: layer = n-1, ordinal = [1, 0_repeated_m, 1], r0 defaults to 10
+    // If m >= maxCols-1, row would exceed maxCols, so lift: array=[[10],[1,m]], layer=n
+    var epsBareMatch = s.match(/^(\d+(?:\.\d+)?)\u03B5(\d+)\s*/);
+    if (epsBareMatch) {
+      var epsBareN = parseInt(epsBareMatch[2], 10);
+      var epsBareM = Math.floor(Number(epsBareMatch[1]));
+      s = s.substring(epsBareMatch[0].length).trim();
+      if (epsBareM < 1 || epsBareN < 1) {
+        x.array = [[0]];
+        if (negateIt) x.sign = -1;
+        return x;
+      }
+      if (epsBareM >= MetaNum.maxCols - 1) {
+        // m >= 99: row [1, 0_m, 1] exceeds maxCols, lift one layer
+        x.layer = epsBareN;
+        x.array[0] = [10];
+        x.array.push([1, epsBareM]);
+      } else {
+        x.layer = epsBareN - 1;
+        x.array[0] = [10];
+        // Build row [1, 0_repeated_epsBareM, 1]
+        var epsBareRow = [1];
+        for (var ebi = 0; ebi < epsBareM; ebi++) epsBareRow.push(0);
+        epsBareRow.push(1);
+        x.array.push(epsBareRow);
+      }
+      if (negateIt) x.sign = -1;
+      // De-layer: Aa form ([*,0,1]) with small r0, reduce layer by 1
+      if (x.layer > 0 && x.array.length >= 2) {
+        var lastRow = x.array[x.array.length - 1];
+        if (lastRow.length === 3 && lastRow[1] === 0 && lastRow[lastRow.length - 1] === 1 &&
+            x.array[0].length === 1 && x.array[0][0] >= 0 && x.array[0][0] <= MetaNum.maxCols - 2) {
+          var baseVal = x.array[0][0];
+          lastRow = [lastRow[0]];
+          for (var di = 0; di < baseVal; di++) lastRow.push(0);
+          lastRow.push(1);
+          x.array[x.array.length - 1] = lastRow;
+          x.layer--;
+        }
+      }
+      return x.normalize();
+    }
+
+    // Parse ε{n} format (layer with no count)
+    var epsSimpleMatch = s.match(/^\u03B5\{(\d+)\}\s*/);
+    if (epsSimpleMatch) {
+      x.layer = parseInt(epsSimpleMatch[1], 10);
+      s = s.substring(epsSimpleMatch[0].length).trim();
+      if (negateIt) x.sign = -1;
+      return x.normalize();
+    }
+
+    // Parse layer symbol + letter pattern + {n} format
+    // (simple case: just {n} after symbol, no letters)
+    var symSimpleMatch = s.match(/^([!@#\$%&~<>?])\{(\d+(?:\.\d+)?)\}\s*$/);
+    if (symSimpleMatch) {
+      var SYMBOL_LAYERS = {'!': 1, '@': 2, '#': 3, '$': 4, '%': 5, '&': 6, '~': 7, '<': 8, '>': 9, '?': 10};
+      x.layer = SYMBOL_LAYERS[symSimpleMatch[1]] || 1;
+      var symSimpleVal = Number(symSimpleMatch[2]);
+      if (!isNaN(symSimpleVal) && isFinite(symSimpleVal)) {
+        x.array[0] = [symSimpleVal];
+      }
+      if (negateIt) x.sign = -1;
+      return x.normalize();
+    }
+
+    // Parse symbol + full letter pattern {n} (multi-letter like !AaBa{n}, handles ^N notation)
+    var symParseMatch = s.match(/^([!@#\$%&~<>?])(.*?)\{(\d+(?:\.\d+)?)\}\s*$/);
+    if (symParseMatch) {
+      var SYMBOL_LAYERS3 = {'!': 1, '@': 2, '#': 3, '$': 4, '%': 5, '&': 6, '~': 7, '<': 8, '>': 9, '?': 10};
+      x.layer = SYMBOL_LAYERS3[symParseMatch[1]] || 1;
+      var symLetters2 = symParseMatch[2].trim();
+      var symBase2 = Number(symParseMatch[3]);
+      
+      // Parse tokens: ordinal tokens have lowercase (Aa, Abc), finite ops are single uppercase
+      var symTokens2 = [];
+      var symFinOps = [];  // finite ops for r0
+      var symTokRegex = /([A-Z][a-z]*)(?:\^(\d+))?/g;
+      var symTokM;
+      while ((symTokM = symTokRegex.exec(symLetters2)) !== null) {
+        var tokName = symTokM[1];
+        var tokCount = symTokM[2] ? parseInt(symTokM[2], 10) : 1;
+        // Single uppercase letter (no lowercase) = finite op
+        if (tokName.length === 1 && tokName[0] >= 'D') {
+          // Finite operations start from E (level 1 = E, level 2 = F, ...)
+          var finLevel = tokName.charCodeAt(0) - 68; // 68 = 'D', E->1, F->2, ...
+          if (finLevel > 0) {
+            symFinOps.push({level: finLevel, count: tokCount});
+          }
+        } else {
+          symTokens2.push({name: tokName, count: tokCount});
+        }
+      }
+      
+      if (symTokens2.length === 0) {
+        x.array[0] = [symBase2];
+        if (negateIt) x.sign = -1;
+        return x;
+      }
+      
+      // Group consecutive identical tokens
+      var symGroups2 = [];
+      for (var ti = 0; ti < symTokens2.length; ti++) {
+        if (symGroups2.length > 0 && symGroups2[symGroups2.length - 1].name === symTokens2[ti].name) {
+          symGroups2[symGroups2.length - 1].count += symTokens2[ti].count;
+        } else {
+          symGroups2.push({name: symTokens2[ti].name, count: symTokens2[ti].count});
+        }
+      }
+      
+      var symRows2 = [];
+      for (var gi3 = 0; gi3 < symGroups2.length; gi3++) {
+        var g3 = symGroups2[gi3];
+        var gName3 = g3.name;
+        var gU3 = gName3[0];
+        var gUIdx3 = gU3.charCodeAt(0) - 64;
+        var gLower3 = gName3.slice(1);
+        var gIndices3 = [];
+        for (var li3 = 0; li3 < gLower3.length; li3++) {
+          gIndices3.push(gLower3.charCodeAt(li3) - 97);
+        }
+        var gK3 = gIndices3.length;
+        var gAllZero3 = true;
+        var gFirstNonZero3 = -1;
+        for (var li3 = 0; li3 < gK3; li3++) {
+          if (gIndices3[li3] !== 0) {
+            gAllZero3 = false;
+            if (gFirstNonZero3 === -1) gFirstNonZero3 = li3;
+          }
+        }
+        var gLastIsA3 = gIndices3[gK3 - 1] === 0;
+        var gRow3 = [g3.count];
+        var gIsDiag3 = false;
+        
+        if (gAllZero3) {
+          for (var li3 = 0; li3 < gK3; li3++) gRow3.push(0);
+          gRow3.push(gUIdx3);
+        } else if (gLastIsA3 && gFirstNonZero3 >= 0) {
+          gIsDiag3 = true;
+          for (var li3 = gK3 - 1; li3 >= 0; li3--) {
+            if (li3 === gK3 - 1) {
+              gRow3.push(symBase2);
+            } else if (li3 === gFirstNonZero3) {
+              gRow3.push(gIndices3[li3] + 1);
+            } else if (li3 < gFirstNonZero3) {
+              gRow3.push(gIndices3[li3]);
+            } else {
+              gRow3.push(0);
+            }
+          }
+          gRow3.push(gUIdx3);
+        } else {
+          for (var li3 = gK3 - 1; li3 >= 0; li3--) {
+            gRow3.push(gIndices3[li3]);
+          }
+          gRow3.push(gUIdx3);
+        }
+        symRows2.push({
+          row: gRow3,
+          isDiag: gIsDiag3,
+          lowerIndices: gIndices3,
+          level: gUIdx3
+        });
+      }
+      
+      symRows2.sort(function(a, b) {
+        if (a.level !== b.level) return a.level - b.level;
+        var maxLen = Math.max(a.lowerIndices.length, b.lowerIndices.length);
+        for (var ii = 0; ii < maxLen; ii++) {
+          var va = ii < a.lowerIndices.length ? a.lowerIndices[ii] : 0;
+          var vb = ii < b.lowerIndices.length ? b.lowerIndices[ii] : 0;
+          if (va !== vb) return va - vb;
+        }
+        return 0;
+      });
+      
+      x.array = [[symBase2]];
+      // Apply finite ops to r0
+      for (var fi = 0; fi < symFinOps.length; fi++) {
+        var fo = symFinOps[fi];
+        x.array[0][fo.level] = (x.array[0][fo.level] || 0) + fo.count;
+      }
+      // Handle special finite ops: F and E
+      // F (level 2): F^count means tetration exponent count-2
+      // E (level 1): E^count means exponent count
+      // Higher levels (G, H, ...) are higher hyperoperation levels
+      x._oaRowData = [];
+      for (var gi3 = 0; gi3 < symRows2.length; gi3++) {
+        x.array.push(symRows2[gi3].row);
+        x._oaRowData.push({isDiag: symRows2[gi3].isDiag});
+      }
+      if (negateIt) x.sign = -1;
+      // De-layer: Aa form [*,0,1] with small r0, reduce layer by 1
+      if (x.layer > 0 && x.array.length >= 2) {
+        var lastRow = x.array[x.array.length - 1];
+        if (lastRow.length === 3 && lastRow[1] === 0 && lastRow[lastRow.length - 1] === 1 &&
+            x.array[0].length === 1 && x.array[0][0] >= 0 && x.array[0][0] <= MetaNum.maxCols - 2) {
+          var baseVal = x.array[0][0];
+          lastRow = [lastRow[0]];
+          for (var di = 0; di < baseVal; di++) lastRow.push(0);
+          lastRow.push(1);
+          x.array[x.array.length - 1] = lastRow;
+          x.layer--;
+        }
+      }
+      return x.normalize();
+    }
+
+    var bracketPattern = /\[([^\]]*)\]/g;
+    var match;
+    var rowIndex = 0;
+
+    while ((match = bracketPattern.exec(s)) !== null) {
+      var nums = match[1].split(",");
+      var row = [];
+      for (var i = 0; i < nums.length; i++) {
+        var raw = nums[i].trim();
+        if (raw[0] === '[') raw = raw.substring(1);
+        if (raw[raw.length - 1] === ']') raw = raw.substring(0, raw.length - 1);
+        var n = Number(raw);
+        if (!isNaN(n) && isFinite(n)) {
+          row.push(n);
+        } else {
+          row.push(0);
+        }
+      }
+      if (rowIndex === 0) {
+        x.array[0] = row;
+      } else {
+        x.array.push(row);
+      }
+      rowIndex++;
+      if (rowIndex >= MetaNum.maxRows) break;
+    }
+
+    if (rowIndex === 0) {
+      var rem = s;
+
+      var tetrMatch = rem.match(/^(\d+(?:\.\d+)?)\s*\^\^\s*(\d+(?:\.\d+)?)\s*$/);
+      if (tetrMatch) {
+        var tetrBase = Number(tetrMatch[1]);
+        var tetrHeight = Number(tetrMatch[2]);
+        if (!isNaN(tetrBase) && !isNaN(tetrHeight) && isFinite(tetrHeight) && tetrHeight >= 0 && tetrHeight === Math.floor(tetrHeight)) {
+          if (tetrHeight === 0) {
+            x.array = [[1]];
+          } else if (tetrHeight === 1) {
+            x.array = [[tetrBase]];
+          } else {
+            var tetrResult = MetaNum.pow(tetrBase, new MetaNum(tetrBase));
+            for (var ti = 3; ti <= tetrHeight; ti++) {
+              tetrResult = MetaNum.pow(tetrBase, tetrResult);
+            }
+            x.array = deepCloneArray(tetrResult.array);
+            x.sign = tetrResult.sign;
+            x.layer = tetrResult.layer;
+          }
+          if (negateIt) x.sign = -1;
+          return x.normalize();
+        }
+      }
+
+      var coeffEMatch = rem.match(/^(\d+(?:\.\d+)?)\s*[Ee]\s*(\d+(?:\.\d+)?)\s*$/);
+      if (coeffEMatch) {
+        var coeff = Number(coeffEMatch[1]);
+        var exp = Number(coeffEMatch[2]);
+        if (!isNaN(coeff) && !isNaN(exp) && isFinite(exp) && coeff > 0) {
+          x.array[0] = [exp + Math.log10(coeff), 1];
+          x.sign = negateIt ? -1 : 1;
+          x.layer = 0;
+          return x.normalize();
+        }
+      }
+
+      var aaMatch = rem.match(/^(\d+)Aa(\d+)/i);
+      if (aaMatch) {
+        var aaCount = aaMatch[1] ? Number(aaMatch[1]) : 1;
+        var aaN = Number(aaMatch[2]);
+        if (!isNaN(aaN) && isFinite(aaN) && aaN >= 1 && aaN === Math.floor(aaN)) {
+          if (aaN < MetaNum.maxCols) {
+            x.array[0] = [10];
+            x.array[0][aaN] = aaCount;
+          } else {
+            x.array = [[10], [aaCount, aaN]];
+          }
+          if (negateIt) x.sign = -1;
+          return x.normalize();
+        }
+      }
+
+      // Handle layer symbol prefix + letter pattern + optional finOps + number (e.g., !Abcd1234, !AaE16, @Bcde500)
+      var symPrefixMatch = rem.match(/^([!@#\$%&~<>?])([A-Z][a-z]+(?:[A-Z][a-z]+)*)([A-Z]*)(\d+)\s*$/);
+      if (symPrefixMatch) {
+        var SYMBOL_LAYERS_P = {'!': 1, '@': 2, '#': 3, '$': 4, '%': 5, '&': 6, '~': 7, '<': 8, '>': 9, '?': 10};
+        x.layer = SYMBOL_LAYERS_P[symPrefixMatch[1]] || 1;
+        // Strip the symbol and let the rest fall through to oaMatch
+        rem = symPrefixMatch[2] + (symPrefixMatch[3] || '') + symPrefixMatch[4];
+      }
+
+      var oaMatch = rem.match(/^((?:[A-Z][a-z]+)+)([A-Z]*)(\d+)/);
+      if (oaMatch) {
+        var oaFullPrefix = oaMatch[1];
+        var oaFinOps = oaMatch[2];
+        var oaN = Number(oaMatch[3]);
+        if (!isNaN(oaN) && isFinite(oaN) && oaN >= 1 && oaN === Math.floor(oaN)) {
+          var oaTokens = [];
+          var oaTokenRegex = /[A-Z][a-z]+/g;
+          var oaTm;
+          while ((oaTm = oaTokenRegex.exec(oaFullPrefix)) !== null) {
+            oaTokens.push(oaTm[0]);
+          }
+
+          var oaGroups = [];
+          for (var ti = 0; ti < oaTokens.length; ti++) {
+            if (oaGroups.length > 0 && oaGroups[oaGroups.length - 1].token === oaTokens[ti]) {
+              oaGroups[oaGroups.length - 1].count++;
+            } else {
+              oaGroups.push({token: oaTokens[ti], count: 1});
+            }
+          }
+
+          var oaRows = [];
+          for (var gi = 0; gi < oaGroups.length; gi++) {
+            var g = oaGroups[gi];
+            var gU = g.token[0];
+            var gUIdx = gU.charCodeAt(0) - 64;
+            var gLower = g.token.slice(1);
+            var gIndices = [];
+            for (var li = 0; li < gLower.length; li++) {
+              gIndices.push(gLower.charCodeAt(li) - 97);
+            }
+            var gK = gIndices.length;
+            var gAllZero = true;
+            var gFirstNonZero = -1;
+            for (var li = 0; li < gK; li++) {
+              if (gIndices[li] !== 0) {
+                gAllZero = false;
+                if (gFirstNonZero === -1) gFirstNonZero = li;
+              }
+            }
+            var gLastIsA = gIndices[gK - 1] === 0;
+            var gRow = [g.count];
+            var gIsDiag = false;
+
+            if (gAllZero) {
+              for (var li = 0; li < gK; li++) gRow.push(0);
+              gRow.push(gUIdx);
+            } else if (gLastIsA && gFirstNonZero >= 0) {
+              gIsDiag = true;
+              for (var li = gK - 1; li >= 0; li--) {
+                if (li === gK - 1) {
+                  gRow.push(oaN);
+                } else if (li === gFirstNonZero) {
+                  gRow.push(gIndices[li] + 1);
+                } else if (li < gFirstNonZero) {
+                  gRow.push(gIndices[li]);
+                } else {
+                  gRow.push(0);
+                }
+              }
+              gRow.push(gUIdx);
+            } else {
+              for (var li = gK - 1; li >= 0; li--) {
+                gRow.push(gIndices[li]);
+              }
+              gRow.push(gUIdx);
+            }
+            oaRows.push({
+              row: gRow,
+              isDiag: gIsDiag,
+              lowerIndices: gIndices,
+              level: gUIdx
+            });
+          }
+
+          oaRows.sort(function(a, b) {
+            if (a.level !== b.level) return a.level - b.level;
+            var maxLen = Math.max(a.lowerIndices.length, b.lowerIndices.length);
+            for (var i = 0; i < maxLen; i++) {
+              var va = i < a.lowerIndices.length ? a.lowerIndices[i] : 0;
+              var vb = i < b.lowerIndices.length ? b.lowerIndices[i] : 0;
+              if (va !== vb) return va - vb;
+            }
+            return 0;
+          });
+
+          x.array = [[oaN]];
+          // Apply finite ops to r0 (single uppercase letters between ordinal tokens and number)
+          if (oaFinOps) {
+            for (var fi = 0; fi < oaFinOps.length; fi++) {
+              var finLevel = oaFinOps.charCodeAt(fi) - 68; // E->1, F->2, G->3, ...
+              if (finLevel > 0) {
+                x.array[0][finLevel] = (x.array[0][finLevel] || 0) + 1;
+              }
+            }
+          }
+          x._oaRowData = [];
+          for (var gi = 0; gi < oaRows.length; gi++) {
+            x.array.push(oaRows[gi].row);
+            x._oaRowData.push({isDiag: oaRows[gi].isDiag});
+          }
+          if (negateIt) x.sign = -1;
+          // De-layer: Aa form [*,0,1] with small r0, reduce layer by 1
+          if (x.layer > 0 && x.array.length >= 2) {
+            var lastRow = x.array[x.array.length - 1];
+            if (lastRow.length === 3 && lastRow[1] === 0 && lastRow[lastRow.length - 1] === 1 &&
+                x.array[0].length === 1 && x.array[0][0] >= 0 && x.array[0][0] <= MetaNum.maxCols - 2) {
+              var baseVal = x.array[0][0];
+              lastRow = [lastRow[0]];
+              for (var di = 0; di < baseVal; di++) lastRow.push(0);
+              lastRow.push(1);
+              x.array[x.array.length - 1] = lastRow;
+              x.layer--;
+            }
+          }
+          return x.normalize();
+        }
+      }
+
+      if (/^[A-Z]+/i.test(rem)) {
+        var prefixMatch = rem.match(/^([A-Z]+)/i);
+        var prefix = prefixMatch[0].toUpperCase();
+        rem = rem.substring(prefixMatch[0].length).trim();
+        var val = Number(rem);
+        if (!isNaN(val) && isFinite(val)) {
+          var counts = {};
+          var maxIdx = 0;
+          for (var i = 0; i < prefix.length; i++) {
+            var letterPos = prefix.charCodeAt(i) - 64;
+            if (letterPos >= 5) {
+              var idx = letterPos - 4;
+              counts[idx] = (counts[idx] || 0) + 1;
+              maxIdx = Math.max(maxIdx, idx);
+            }
+          }
+          x.array[0] = [val];
+          var eCount = counts[1] || 0;
+          var fCount = counts[2] || 0;
+          if (fCount > 0 && eCount === 0 && fCount === 1 && maxIdx === 2 && val >= 0 && val === Math.floor(val)) {
+            if (val === 0) {
+              x.array = [[1]];
+            } else if (val === 1) {
+              x.array = [[10]];
+            } else {
+              x.array[0] = [10000000000, val - 2];
+            }
+          } else if (maxIdx === 1) {
+            x.array[0][1] = eCount;
+          } else {
+            for (var idx = 1; idx <= maxIdx; idx++) {
+              x.array[0][idx] = counts[idx] || 0;
+            }
+          }
+          if (negateIt) x.sign = -1;
+          return x.normalize();
+        }
+      }
+
+      var num = Number(rem);
+      if (!isNaN(num) && isFinite(num)) {
+        x.array[0][0] = num;
+      }
+    }
+
+    if (negateIt) x.sign = -1;
+    return x.normalize();
+  };
+
+  P.clone = function () {
+    var x = new MetaNum();
+    x.array = deepCloneArray(this.array);
+    x.sign = this.sign;
+    x.layer = this.layer;
+    return x;
+  };
+
+  function objectCreate() {
+    var x = {};
+    x.array = [[0]];
+    x.sign = 1;
+    x.layer = 0;
+    return x;
+  }
+
+  function clone(obj) {
+    var i, p, ps;
+    function MetaNum(input, input2, input3) {
+      var x = this;
+      if (!(x instanceof MetaNum)) return new MetaNum(input, input2, input3);
+      x.constructor = MetaNum;
+
+      if (input === undefined || input === null) {
+        x.array = [[0]];
+        x.sign = 1;
+        x.layer = 0;
+        return x;
+      }
+
+      var parsedObject = null;
+      if (typeof input === "string" && (input[0] === "[" || input[0] === "{")) {
+        try {
+          parsedObject = JSON.parse(input);
+        } catch (e) {}
+      }
+
+      var temp;
+      if (typeof input === "number" && input2 === undefined) {
+        temp = objectCreate();
+        temp.array = [[Math.abs(input)]];
+        temp.sign = input < 0 ? -1 : 1;
+        temp.layer = 0;
+        temp.normalize = P.normalize;
+        temp = temp.normalize();
+      } else if (parsedObject) {
+        temp = Q.fromObject(parsedObject);
+      } else if (typeof input === "string") {
+        temp = Q.fromString(input);
+      } else if (Array.isArray(input)) {
+        temp = Q.fromArray(input, input2, input3);
+      } else if (input instanceof MetaNum) {
+        temp = input;
+      } else if (typeof input === "object" && input !== null) {
+        temp = Q.fromObject(input);
+      } else {
+        temp = objectCreate();
+        var num = Number(input);
+        if (!isNaN(num) && isFinite(num)) {
+          temp.array = [[Math.abs(num)]];
+          temp.sign = num < 0 ? -1 : 1;
+          temp.layer = 0;
+          temp.normalize = P.normalize;
+          temp = temp.normalize();
+        } else if (isNaN(num)) {
+          temp.array = [[NaN]];
+        } else {
+          temp.array = [[Infinity]];
+          temp.sign = num < 0 ? -1 : 1;
+        }
+      }
+
+      x.array = deepCloneArray(temp.array);
+      x.sign = temp.sign;
+      x.layer = temp.layer;
+      if (temp._oaIsDiag !== undefined) x._oaIsDiag = temp._oaIsDiag;
+      if (temp._oaRowData !== undefined) x._oaRowData = temp._oaRowData.map(function(d) { return {isDiag: d.isDiag}; });
+
+      return x;
+    }
+
+    MetaNum.prototype = P;
+
+    MetaNum.JSON = 0;
+    MetaNum.STRING = 1;
+
+    MetaNum.NONE = 0;
+    MetaNum.NORMAL = 1;
+    MetaNum.ALL = 2;
+
+    // expandOrdinals: Generate all Cantor normal form terms below a given ordinal level
+    // cantorLevel: determines max nesting depth (diag range and numVals range)
+    // maxVal: determines value range (0..maxVal) for each position
+    // Returns array of ordinal rows [[1, v0, diag], [1, v0, v1, diag], ...]
+    MetaNum.expandOrdinals = function (cantorLevel, maxVal) {
+      var rows = [];
+      var maxRows = MetaNum.maxCols - 1; // 99
+
+      if (cantorLevel < 0) cantorLevel = 0;
+
+      // Generate all combinations: numVals outer, diag inner (for increasing ordinal value)
+      // Order: nv=1(d=1..cantorLevel), nv=2(d=1..cantorLevel), ..., plus special row
+      for (var nv = 1; nv <= cantorLevel && rows.length < maxRows; nv++) {
+        for (var d = 1; d <= cantorLevel && rows.length < maxRows; d++) {
+          var total = Math.pow(maxVal + 1, nv);
+          for (var ci = 0; ci < total && rows.length < maxRows; ci++) {
+            var vals = [];
+            var tmp = ci;
+            for (var k = 0; k < nv; k++) {
+              vals.push(tmp % (maxVal + 1));
+              tmp = Math.floor(tmp / (maxVal + 1));
+            }
+            var row = [1];
+            for (var k = 0; k < nv; k++) row.push(vals[k]);
+            row.push(d);
+            rows.push(row);
+          }
+        }
+      }
+
+      // Add boundary/special row [1, 0, ..., 0, 1] with (cantorLevel+1) zeros + diag=1
+      // For cantorLevel=0: generates the sole row [[1,0,1]] (1 zero)
+      // For cantorLevel>=2: adds the terminal row [1, 0, ..., 0, 1] with cantorLevel+1 zeros
+      // For cantorLevel=1: skip (not needed)
+      if ((cantorLevel === 0 || cantorLevel >= 2) && rows.length < maxRows) {
+        var bRow = [1];
+        var zeroCount = (cantorLevel === 0) ? 1 : (cantorLevel + 1);
+        for (var k = 0; k < zeroCount; k++) bRow.push(0);
+        bRow.push(1);
+        rows.push(bRow);
+      }
+
+      return rows;
+    };
+
+    // getCantorLevel: map operation level to expandOrdinals cantorLevel
+    // v0 values: 0=ω+1, 1=ω*2+1, 2=ω*3+1, 3-5=ω^ω range,
+    //            6=ω^2+1, 7=ω^2+ω, 8=ω^2+ω+1, 9=ω^2*2,
+    //            10=ω^3, 11=ω^3+1, ...
+    MetaNum.getCantorLevel = function (levelN) {
+      // For now, simple mapping based on known cases
+      if (levelN <= 0) return 0;     // ω+1: expande
+      if (levelN <= 2) return 1;     // ω*2+1 through ω*3+1
+      if (levelN <= 5) return 1;     // ω^ω diagonalization range
+      if (levelN <= 9) return 1;     // ω^2 range
+      if (levelN <= 11) return 2;    // ω^3 range
+      // Default: use levelN / some factor
+      return Math.min(Math.floor(levelN / 5) + 1, MetaNum.maxCols);
+    };
+
+    MetaNum.clone = clone;
+    MetaNum.config = MetaNum.set = config;
+
+    for (var prop in Q) {
+      if (Q.hasOwnProperty(prop)) {
+        MetaNum[prop] = Q[prop];
+      }
+    }
+
+    if (obj === void 0) obj = {};
+    if (obj) {
+      ps = ['maxRows', 'maxCols', 'maxArrow', 'serializeMode', 'debug'];
+      for (i = 0; i < ps.length;) if (!obj.hasOwnProperty(p = ps[i++])) obj[p] = this[p];
+    }
+
+    MetaNum.config(obj);
+
+    return MetaNum;
+  }
+
+  function defineConstants(obj) {
+    for (var prop in R) {
+      if (R.hasOwnProperty(prop)) {
+        var val = R[prop];
+        if (typeof val === "string") {
+          obj[prop] = val;
+        } else if (Object.defineProperty) {
+          Object.defineProperty(obj, prop, {
+            configurable: false,
+            enumerable: true,
+            writable: false,
+            value: new MetaNum(val)
+          });
+        } else {
+          obj[prop] = new MetaNum(val);
         }
       }
     }
-    //#region 4 Basic calculates.
-    /**
-     * Addition
-     * @returns the sum of `this` and `other`
-     */
-    return _createClass(PowiainaNum, [{
-      key: "add",
-      value: function add(other) {
-        var _a, _b, _c, _d;
-        var x = this.normalize();
-        var y = new PowiainaNum(other);
-        // inf + -inf = nan
-        if (x.eq(PowiainaNum.POSITIVE_INFINITY) && y.eq(PowiainaNum.NEGATIVE_INFINITY) || x.eq(PowiainaNum.NEGATIVE_INFINITY) && y.eq(PowiainaNum.POSITIVE_INFINITY)) {
-          if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-          return PowiainaNum.NaN;
-        }
-        // inf & nan check
-        if (!x.isFinite()) return x;
-        if (!y.isFinite()) return y;
-        // if x or y = 0, return other.
-        if (x.isZero()) return y;
-        if (y.isZero()) return x;
-        // x+ -x = 0
-        if (x.sign == -y.sign && function () {
-          var a = x.abs();
-          var b = y.abs();
-          return a.eq(b);
-        }()) return PowiainaNum.ZERO;
-        // Run pure number calculates in there
-        if (x.abs().lt(MSI) && y.abs().lt(MSI)) {
-          if (x.abs().gte(MSI_REC) && y.abs().gte(MSI_REC)) return PowiainaNum.fromNumber(x.toNumber() + y.toNumber());
-        }
-        // calculate anything > e9e15 or <e-9e15, take absval bigger.
-        if (x.abs().lt(PowiainaNum.E_MSI_REC) || x.abs().gt(PowiainaNum.E_MSI) || y.abs().lt(PowiainaNum.E_MSI_REC) || y.abs().gt(PowiainaNum.E_MSI)) {
-          var _a2 = x.maxabs(y);
-          if (x.abs().eq(_a2)) return x;
-          if (y.abs().eq(_a2)) return y;
-          return y;
-        }
-        if (x.sign == -1) {
-          return x.neg().add(y.neg()).neg();
-        }
-        // if ((x.sign==1&&y.sign==-1&&x.lt(y.abs()))  ) return y.neg().add(x.neg()).neg();
-        var a, b; //a=bigger, b=smaller
-        if (x.cmpabs(y) > 0) {
-          a = x;
-          b = y;
-        } else {
-          b = x;
-          a = y;
-        }
-        var temp = a.toNumber() + b.toNumber();
-        if (isFinite(temp) && temp !== 0) {
-          return PowiainaNum.fromNumber(temp);
-        }
-        var signMult = 1;
-        /**Calculate numbers [1, 9e15] (useless) */
-        if (!a.small && !b.small && !((_a = a.array[1]) === null || _a === void 0 ? void 0 : _a.repeat) && !((_b = b.array[1]) === null || _b === void 0 ? void 0 : _b.repeat) && a.sign == b.sign) {
-          return new PowiainaNum((a.array[0].repeat + b.array[0].repeat) * a.sign);
-        }
-        // Calculate a & b's 10-logarithm
-        var alog10 = (a.small ? -1 : 1) * (((_c = a.array[1]) === null || _c === void 0 ? void 0 : _c.repeat) ? a.array[0].repeat : Math.log10(a.array[0].repeat));
-        var blog10 = (b.small ? -1 : 1) * (((_d = b.array[1]) === null || _d === void 0 ? void 0 : _d.repeat) ? b.array[0].repeat : Math.log10(b.array[0].repeat));
-        if (alog10 - blog10 > MSI_LOG10) return a;
-        /**
-         * Offset, a number can make 10^ a+off calculatable not very small or big
-         */
-        var offset = -Math.floor(alog10); //a number can make a+off in [0,1)
-        var resultLogarithm = 0;
-        /** 10^(a+off) + 10^(b+off). */
-        var offsetedResult = a.sign * Math.pow(10, alog10 + offset) + b.sign * Math.pow(10, blog10 + offset);
-        if (offsetedResult > 0) resultLogarithm = Math.log10(offsetedResult) - offset;
-        if (offsetedResult < 0) {
-          resultLogarithm = Math.log10(-offsetedResult) - offset;
-          signMult *= -1;
-        }
-        if (offsetedResult == 0) return PowiainaNum.ZERO;
-        var resultPN = PowiainaNum.NaN;
-        resultPN.sign = 1;
-        /** abs(resultLogarithm) > 15.9, use 10^x form. */
-        if (resultLogarithm > MSI_LOG10 || resultLogarithm < -MSI_LOG10) {
-          resultPN.array = [newOperator(resultLogarithm, 0), newOperator(1, 1)];
-          /**otherwise, use 10** abs(resultLogarithm) */
-        } else {
-          resultPN.array = [newOperator(Math.pow(10, Math.abs(resultLogarithm)), 0)];
-        }
-        resultPN.small = resultLogarithm < 0 ? true : false;
-        resultPN.sign *= signMult;
-        return resultPN;
-      }
-    }, {
-      key: "plus",
-      value: function plus(other) {
-        return this.add(other);
-      }
-    }, {
-      key: "sub",
-      value: function sub(a) {
-        return this.add(new PowiainaNum(a).neg());
-      }
-    }, {
-      key: "minus",
-      value: function minus(other) {
-        return this.sub(other);
-      }
-    }, {
-      key: "mul",
-      value: function mul(other) {
-        var x = this;
-        var y = new PowiainaNum(other);
-        // inf * -inf = -inf
-        if (x.eq(PowiainaNum.POSITIVE_INFINITY) && y.eq(PowiainaNum.NEGATIVE_INFINITY) || y.eq(PowiainaNum.POSITIVE_INFINITY) && x.eq(PowiainaNum.NEGATIVE_INFINITY)) return PowiainaNum.NEGATIVE_INFINITY;
-        if (x.isInfiNaN() && y.isZero() || y.isInfiNaN() && x.isZero()) {
-          if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-          return PowiainaNum.NaN;
-        }
-        if (x.eq(PowiainaNum.NEGATIVE_INFINITY) && y.eq(PowiainaNum.NEGATIVE_INFINITY)) return PowiainaNum.POSITIVE_INFINITY;
-        // inf & nan check
-        if (!x.isFinite()) return x;
-        if (!y.isFinite()) return y;
-        if (x.isZero() || y.isZero()) return PowiainaNum.ZERO;
-        // x* x^-1 = 0
-        /* if (x.small==1-y.small&&(function(){
-          let a = x.abs();
-          let b = y.abs();
-          return a.eq(b)
-        })()) return (function () {
-          let a = new PowiainaNum(1);
-          a.sign = x.sign*y.sign as -1|0| 1;
-          return a;
-        })(); */
-        // calculate use number directly using number
-        var t = x.toNumber() * y.toNumber();
-        if (isFinite(t) && t !== 0) {
-          return PowiainaNum.fromNumber(t);
-        }
-        var r;
-        r = x.abs().log10().add(y.abs().log10()).pow10();
-        r.sign = x.sign * y.sign;
-        return r;
-      }
-    }, {
-      key: "times",
-      value: function times(other) {
-        return this.mul(other);
-      }
-    }, {
-      key: "div",
-      value: function div(other) {
-        var x = new PowiainaNum(other).rec();
-        return this.mul(x);
-      }
-    }, {
-      key: "divide",
-      value: function divide(other) {
-        return this.div(other);
-      }
-    }, {
-      key: "mod",
-      value: function mod(x) {
-        var other = new PowiainaNum(x);
-        var division = this.div(other);
-        return division.sub(division.floor()).mul(other);
-      }
-    }, {
-      key: "modulus",
-      value: function modulus(x) {
-        return this.mod(x);
-      }
-    }, {
-      key: "pow10",
-      value:
-      //#endregion
-      //#region power
-      /**
-       * @returns 10 to the power of `this`
-       */
-      function pow10() {
-        var _a, _b;
-        var thisObject = this.clone();
-        // inf & nan check
-        if (!this.isFinite()) return this;
-        /** when 10^(t), t<0, use 10^(-t) reciprocate. */
-        if (thisObject.isneg()) {
-          // 10^(-x) = 1/(10^x)
-          thisObject.sign *= -1;
-          return thisObject.pow10().rec();
-        }
-        /**if t lessthan log10 2^1024, use fromNumber. */
-        if (thisObject.lt(308.25471555991675)) {
-          return PowiainaNum.fromNumber(Math.pow(10, thisObject.toNumber()));
-        }
-        /**calculate directly */
-        if (thisObject.small) {
-          if (thisObject.lt(PowiainaNum.MSI_REC)) return PowiainaNum.ONE;
-          return new PowiainaNum(Math.pow(10, Math.pow(thisObject.array[0].repeat, -1)));
-        }
-        /** indistinguishable above 10^^9e15 */
-        if (thisObject.gt(PowiainaNum.TETRATED_MSI)) return thisObject;
-        /**otherwise add 10^ directly */
-        thisObject.setOperator(((_b = (_a = thisObject.array[1]) === null || _a === void 0 ? void 0 : _a.repeat) !== null && _b !== void 0 ? _b : 0) + 1, 1);
-        thisObject.normalize();
-        return thisObject;
-      }
-    }, {
-      key: "pow",
-      value: function pow(x) {
-        var other = new PowiainaNum(x);
-        if (this.eq(1)) return PowiainaNum.ONE;
-        if (!other.isFinite()) return other;
-        if (!this.isFinite()) return this;
-        if (this.eq(10)) return other.pow10();
-        if (other.isneg()) return this.pow(other.neg()).rec();
-        if (this.isneg()) {
-          if (!other.isInt()) {
-            if (other.small) {
-              if (other.rec().div(2).eq(1)) {
-                return this.neg().pow(other).neg();
-              }
-            }
-            if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-            return PowiainaNum.NaN;
-          }
-          var r = this.abs().pow(other);
-          r.sign = function () {
-            var a = other.mod(2).round();
-            if (a.eq(0) || a.eq(2)) return 1;
-            return -1;
-          }();
-          return r;
-        }
-        var a = this.toNumber();
-        var b = other.toNumber();
-        var t = Math.pow(a, b);
-        if (isFinite(t) && t !== 0) {
-          // optimize?
-          return PowiainaNum.fromNumber(t);
-        }
-        if (this.isZero() && other.isZero()) {
-          return PowiainaNum.ONE;
-        }
-        if (this.isZero()) return PowiainaNum.ZERO;
-        if (other.isZero()) return PowiainaNum.ONE;
-        // if this<0, check other' rec is oddd
-        if (this.gt(0)) {
-          // log10(a^b) = b log10(a)
-          return this.log10().mul(other).pow10();
-        } else if (other.rec().mod(2).eq(1)) {
-          return this.neg().log10().mul(other).pow10().neg();
-        }
-        if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-        return PowiainaNum.NaN;
-      }
-    }, {
-      key: "pow_base",
-      value: function pow_base(x) {
-        var a = new PowiainaNum(x);
-        return a.pow(this);
-      }
-    }, {
-      key: "root",
-      value: function root(x) {
-        var other = new PowiainaNum(x);
-        return this.pow(other.rec());
-      }
-    }, {
-      key: "sqrt",
-      value: function sqrt() {
-        return this.pow(0.5);
-      }
-    }, {
-      key: "cbrt",
-      value: function cbrt() {
-        return this.abs().root(3).mul(this.sign);
-      }
-    }, {
-      key: "log10",
-      value: function log10() {
-        if (this.isneg()) {
-          if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-          return PowiainaNum.NaN;
-        }
-        if (this.isZero()) return PowiainaNum.NEGATIVE_INFINITY;
-        if (this.small) {
-          var _x = this.clone();
-          _x.small = !_x.small;
-          return _x.log10().neg();
-        }
-        if (this.array.length == 1) return new PowiainaNum(Math.log10(this.array[0].repeat));
-        if (this.gte(PowiainaNum.TETRATED_MSI)) return this;
-        var x = this.clone();
-        x.array[1].repeat = x.array[1].repeat - 1;
-        x.normalize();
-        return x;
-      }
-    }, {
-      key: "log",
-      value: function log() {
-        var base = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : Math.E;
-        // log_a b = log_x b / log_x a;
-        var other = new PowiainaNum(base);
-        return this.log10().div(other.log10());
-      }
-    }, {
-      key: "log2",
-      value: function log2() {
-        return this.log(2);
-      }
-    }, {
-      key: "logBase",
-      value: function logBase(a) {
-        return this.log(a);
-      }
-    }, {
-      key: "ln",
-      value: function ln() {
-        return this.log();
-      }
-      /**
-       * positive-Log10, Returns the base-10 logarithm of nonnegative Decimals, but returns 0 for negative Decimals.
-       */
-    }, {
-      key: "pLog10",
-      value: function pLog10() {
-        if (this.isneg()) return PowiainaNum.ZERO;
-        return this.log10();
-      }
-      /**
-       * positive-Log10
-       */
-    }, {
-      key: "exp",
-      value: function exp() {
-        return this.pow_base(Math.E);
-      }
-      //#endregion
-      //#region some math functions
-      /**
-       * For positive integers, X factorial (written as X!) equals X * (X - 1) * (X - 2) *... * 3 * 2 * 1. 0! equals 1.
-       * This can be extended to real numbers (except for negative integers) via the gamma function, which is what this function does.
-       */
-      //[Code from break_eternity.js]
-    }, {
-      key: "factorial",
-      value: function factorial() {
-        if (this.abs().lt(MSI)) {
-          return this.add(1).gamma();
-        } else if (this.abs().lt(PowiainaNum.E_MSI)) {
-          return PowiainaNum.exp(this.mul(this.log10().sub(1)));
-        } else {
-          return PowiainaNum.exp(this);
-        }
-      }
-    }, {
-      key: "gamma",
-      value:
-      /**
-       * The gamma function extends the idea of factorials to non-whole numbers using some calculus.
-       * Gamma(x) is defined as the integral of t^(x-1) * e^-t dt from t = 0 to t = infinity,
-       * and gamma(x) = (x - 1)! for nonnegative integer x, so the factorial for non-whole numbers is defined using the gamma function.
-       */
-      //[Code from break_eternity.js]
-      //from HyperCalc source code
-      function gamma() {
-        if (this.small) {
-          return this.rec();
-        } else if (this.lte(MSI)) {
-          if (this.lt(24)) {
-            return PowiainaNum.fromNumber(f_gamma(this.sign * this.array[0].repeat));
-          }
-          var t = this.array[0].repeat - 1;
-          var l = 0.9189385332046727; //0.5*Math.log(2*Math.PI)
-          l = l + (t + 0.5) * Math.log(t);
-          l = l - t;
-          var n2 = t * t;
-          var np = t;
-          var lm = 12 * np;
-          var adj = 1 / lm;
-          var l2 = l + adj;
-          if (l2 === l) {
-            return PowiainaNum.exp(l);
-          }
-          l = l2;
-          np = np * n2;
-          lm = 360 * np;
-          adj = 1 / lm;
-          l2 = l - adj;
-          if (l2 === l) {
-            return PowiainaNum.exp(l);
-          }
-          l = l2;
-          np = np * n2;
-          lm = 1260 * np;
-          var lt = 1 / lm;
-          l = l + lt;
-          np = np * n2;
-          lm = 1680 * np;
-          lt = 1 / lm;
-          l = l - lt;
-          return PowiainaNum.exp(l);
-        } else if (this.gt(MSI)) {
-          return PowiainaNum.exp(this.mul(this.log().sub(1)));
-        } else {
-          return PowiainaNum.exp(this);
-        }
-      }
-    }, {
-      key: "lambertw",
-      value:
-      /**
-       * The Lambert W function, also called the omega function or product logarithm, is the solution W(x) === x*e^x.
-       * https://en.wikipedia.org/wiki/Lambert_W_function
-       *
-       * This is a multi-valued function in the complex plane, but only two branches matter for real numbers: the "principal branch" W0, and the "non-principal branch" W_-1.
-       * W_0 works for any number >= -1/e, but W_-1 only works for nonpositive numbers >= -1/e.
-       * The "principal" parameter, which is true by default, decides which branch we're looking for: W_0 is used if principal is true, W_-1 is used if principal is false.
-       */
-      //Code from break_eternity.js
-      //Some special values, for testing: https://en.wikipedia.org/wiki/Lambert_W_function#Special_values
-      function lambertw() {
-        var princ = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : true;
-        var principal = princ;
-        if (this.lt(-0.3678794411710499)) {
-          if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-          return PowiainaNum.NaN; //complex
-        } else if (principal) {
-          if (this.abs().lt("1e-300")) return new PowiainaNum(this);else if (this.small) {
-            return PowiainaNum.fromNumber(f_lambertw(this.toNumber()));
-          } else if (this.lt(MSI)) {
-            return PowiainaNum.fromNumber(f_lambertw(this.sign * this.array[0].repeat));
-          } else if (this.lt("eee15")) {
-            return d_lambertw(this);
-          } else {
-            // Numbers this large would sometimes fail to converge using d_lambertw, and at this size this.ln() is close enough
-            return this.log();
-          }
-        } else {
-          if (this.sign === -1) {
-            if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-            return PowiainaNum.NaN; //complex
-          }
-          if (this.lt(9e15)) {
-            return PowiainaNum.fromNumber(f_lambertw(this.sign * this.array[0].repeat, 1e-10, false));
-          } else if (this.lt(PowiainaNum.E_MSI)) {
-            return d_lambertw(this, 1e-10, false);
-          } else {
-            return this.neg().rec().lambertw().neg();
-          }
-        }
-      }
-    }, {
-      key: "tetrate",
-      value:
-      //#endregion
-      //#region higher calculates
-      //#region Tetration
-      // Code from ExpantaNum.js
-      function tetrate(other2) {
-        var payload = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
-        var t = this;
-        var other = new PowiainaNum(other2);
-        var payl = new PowiainaNum(payload);
-        if (t.isNaN() || other.isNaN() || payl.isNaN()) {
-          if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-          return PowiainaNum.NaN;
-        }
-        if (t.eq(1)) return PowiainaNum.ONE;
-        if (payl.neq(PowiainaNum.ONE) && t.gte(EXP_E_REC)) {
-          other = other.add(payl.slog(t));
-        }
-        var negln;
-        if (other.isInfi() && other.sign > 0) {
-          if (t.gte(EXP_E_REC)) return PowiainaNum.POSITIVE_INFINITY;
-          negln = this.log().neg();
-          return negln.lambertw().div(negln);
-        }
-        if (other.lte(-2)) {
-          if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-          return PowiainaNum.NaN;
-        }
-        if (t.isZero()) {
-          if (other.isZero()) {
-            if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-            return PowiainaNum.NaN;
-          }
-          if (other.gte(MSI / 2) || other.toNumber() % 2 == 0) return PowiainaNum.ZERO;
-          return PowiainaNum.ONE;
-        }
-        if (t.eq(PowiainaNum.ONE)) {
-          if (other.eq(PowiainaNum.ONE.neg())) {
-            if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-            return PowiainaNum.NaN;
-          }
-          return PowiainaNum.ONE;
-        }
-        if (other.eq(PowiainaNum.ONE.neg())) return PowiainaNum.ZERO;
-        if (other.eq(PowiainaNum.ZERO)) return PowiainaNum.ONE;
-        if (other.eq(PowiainaNum.ONE)) return t;
-        if (other.eq(2)) return t.pow(t);
-        if (t.eq(2)) {
-          if (other.eq(3)) return PowiainaNum.fromNumber(16);
-          if (other.eq(4)) return PowiainaNum.fromNumber(65536);
-        }
-        var m = t.max(other);
-        if (m.gt(PowiainaNum.PENTATED_MSI)) return m;
-        if (m.gt(PowiainaNum.TETRATED_MSI) || other.gt(MSI)) {
-          if (this.lt(EXP_E_REC)) {
-            negln = t.ln().neg();
-            return negln.lambertw().div(negln);
-          }
-          var j = t.slog(10).add(other);
-          j.setOperator(j.getOperator(2) + 1, 2);
-          j.normalize();
-          return j;
-        }
-        var y = other.toNumber();
-        var f = Math.floor(y);
-        var r = t.pow(y - f);
-        var l = PowiainaNum.NaN;
-        var i = 0;
-        for (var w = PowiainaNum.E_MSI; f !== 0 && r.lt(w) && i < 100; ++i) {
-          if (f > 0) {
-            r = t.pow(r);
-            if (l.eq(r)) {
-              f = 0;
-              break;
-            }
-            l = r;
-            --f;
-          } else {
-            r = r.log(t);
-            if (l.eq(r)) {
-              f = 0;
-              break;
-            }
-            l = r;
-            ++f;
-          }
-        }
-        if (i == 100 || this.lt(EXP_E_REC)) f = 0;
-        r.setOperator(r.getOperator(1) + f, 1);
-        r.normalize();
-        return r;
-      }
-    }, {
-      key: "tetr",
-      value: function tetr(other2) {
-        var payload = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
-        return this.tetrate(other2, payload);
-      }
-      // Code from ExpantaNum.js
-    }, {
-      key: "slog",
-      value: function slog() {
-        var base = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 10;
-        var x = this;
-        var b = new PowiainaNum(base);
-        if (x.isInfiNaN()) return x;
-        if (b.isNaN()) return b;
-        if (b.isInfi()) return PowiainaNum.ZERO;
-        if (x.isZero()) return PowiainaNum.ONE;
-        if (x.eq(PowiainaNum.ONE)) return PowiainaNum.ZERO;
-        if (x.eq(b)) return PowiainaNum.ONE;
-        if (b.lt(EXP_E_REC)) {
-          var a = b.tetrate(Infinity);
-          if (x.eq(a)) return PowiainaNum.POSITIVE_INFINITY;
-          if (x.gt(a)) {
-            if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-            return PowiainaNum.NaN;
-          }
-        }
-        if (x.max(b).gt(PowiainaNum.PENTATED_MSI)) {
-          if (x.gt(b)) return x;
-          return PowiainaNum.ZERO;
-        }
-        if (x.max(b).gt(PowiainaNum.TETRATED_MSI)) {
-          if (x.gt(b)) {
-            x.setOperator(x.getOperator(2) - 1, 2);
-            x.normalize();
-            return x.sub(x.getOperator(1));
-          }
-        }
-        if (x.lt(PowiainaNum.ZERO)) return b.pow(x).sub(2);
-        // base^base^... = x? (? bases)
-        var r = 0;
-        // 计算x与base的差距
-        var t = x.getOperator(1) - b.getOperator(1);
-        if (t > 3) {
-          var l = t - 3;
-          r += l;
-          x.setOperator(x.getOperator(1) - l, 1);
-        }
-        // 假设b=3， x=1e19
-        for (var i = 0; i < 100; ++i) {
-          if (x.lt(PowiainaNum.ZERO)) {
-            x = PowiainaNum.pow(base, x);
-            --r;
-          } else if (x.lte(1)) {
-            // 第五次，进入此处
-            // 结果=4+0.08795395574340908-1=3.087953...
-            // 验算3**3**3**(3**.08795395574340908)=10000000000000720000,符合预期
-            return new PowiainaNum(r + x.toNumber() - 1);
-          } else {
-            // 第1-4次迭代，进入此处
-            ++r;
-            x = PowiainaNum.log(x, base);
-            // 第一次：r = 1, x = log_3(1e19) ~ 39.822162211498316
-            // 第二次：r = 2, x = log_3(39.822...) ~ 3.353706885314807
-            // 第三次：r = 3, x = log_3(3.3537...) ~ 1.1014497830508163
-            // 第四次：r = 4, x = log_3(1.1014...) ~ 0.08795395574340908
-          }
-        }
-        if (x.gt(10)) return new PowiainaNum(r);
-        if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-        return PowiainaNum.NaN;
-      }
-    }, {
-      key: "ssqrt",
-      value: function ssqrt() {
-        var x = this;
-        if (x.lt(1 / EXP_E_REC)) {
-          if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-          return PowiainaNum.NaN;
-        }
-        if (!x.isFinite()) return x;
-        if (x.gt(PowiainaNum.TETRATED_MSI)) return x;
-        if (x.gt(PowiainaNum.EE_MSI)) {
-          x.setOperator(x.getOperator(1) - 1, 1);
-          return x;
-        }
-        // use lambertw
-        var l = x.ln();
-        return l.div(l.lambertw());
-      }
-    }, {
-      key: "tetrate_10",
-      value: function tetrate_10() {
-        return PowiainaNum.tetrate(10, this);
-      }
-    }, {
-      key: "iteratedlog",
-      value:
-      /**
-       * iterated-log
-       *
-       * @example new P("10^10^3").iteratedlog(2,10) == 3
-       */
-      function iteratedlog() {
-        var other2 = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 1;
-        var base2 = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 10;
-        var t = this;
-        var base = new PowiainaNum(base2);
-        var other = new PowiainaNum(other2);
-        if (other.isZero()) return t;
-        if (other.eq(PowiainaNum.ONE)) return t.log(base);
-        return base.tetrate(t.slog(base).sub(other));
-      }
-    }, {
-      key: "omegalog",
-      value: function omegalog() {
-        var bbase = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 10;
-        var EPSILON = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1e-6;
-        var target = this;
-        var dis = target;
-        if (dis.isInfiNaN()) return dis;
-        if (dis.gte("10{1,2}e15.954589770191003")) return dis;
-        var base = new PowiainaNum(bbase);
-        if (dis.getOperator(1 / 0) >= 1) {
-          dis.setOperator(dis.getOperator(1 / 0) - 1, 1 / 0, 1, 1);
-          return dis;
-        }
-        // if (dis.layer >= 1) {
-        // dis.layer -= 1
-        // return dis
-        // } else
-        // // @ts-expect-error
-        // if (dis.arr01[dis.array.length - 1][0] >= 98) {
-        //   // @ts-expect-error
-        //   let zero = new PowiainaNum(dis.array[dis.arr01.length - 1][0]);
-        //   return zero;
-        // }
-        // else
-        if (target.lt(PowiainaNum.pentate(base, 2))) {
-          return new PowiainaNum(target).anyarrow_log(3)(base);
-        }
-        // else {
-        //   let addTest = 8;
-        //   let target = 0;
-        //   while (addTest >= 10 ** -10) {
-        //     if (PowiainaNum.arrFrac(base, target + addTest).lte(dis)) {
-        //       target += addTest;
-        //     }
-        //     addTest /= 2;
-        //   }
-        //   return new PowiainaNum(target);
-        // }
-        if (bbase == 10) {
-          var clonedOperators = [];
-          for (var i = 0; i < target.array.length; i++) {
-            clonedOperators[i] = {
-              arrow: target.array[i].arrow,
-              expans: target.array[i].expans,
-              megota: target.array[i].megota,
-              repeat: target.array[i].repeat,
-              valuereplaced: target.array[i].valuereplaced
-            };
-          }
-          var _result = PowiainaNum.omegacollect(clonedOperators);
-          return new PowiainaNum(_result[1].arrow - 1 + Math.log(_result[0].repeat / 2) / Math.log(5));
-        }
-        var left = 2;
-        var right = 9007199254740991;
-        var result = NaN;
-        while (left <= right) {
-          var mid = Math.floor((left + right) / 2);
-          var comparison = PowiainaNum.arrFrac(base, mid).cmp(target);
-          if (comparison === 0) {
-            return new PowiainaNum(mid);
-          } else if (comparison < 0) {
-            result = mid;
-            left = mid + 1;
-          } else {
-            right = mid - 1;
-          }
-          if (Math.abs(left - right) <= EPSILON) {
-            return new PowiainaNum(mid);
-          }
-        }
-        return new PowiainaNum(result);
-        // if (dis.arr01[dis.array.length - 1][0] >= 98) {
-        //   // @ts-expect-error
-        //   let zero = new PowiainaNum(dis.array[dis.arr01.length - 1][0]);
-        //   return zero;
-        // } else if (target.lt(PowiainaNum.pentate(bbase, 2))) {
-        //   return new PowiainaNum(target).anyarrow_log(3)(bbase);
-        // } else {
-        //   let addTest = 8;
-        //   let target = 0;
-        //   while (addTest >= 10 ** -10) {
-        //     if (PowiainaNum.arrFrac(base, target + addTest).lte(dis)) {
-        //       target += addTest;
-        //     }
-        //     addTest /= 2;
-        //   }
-        //   return new PowiainaNum(target);
-        // }
-      }
-      /**
-       * Arrow operation, return a function
-       * The function has a parameter `other`
-       * call this function returns a powiainanum `this`{`arrow2`}`other`
-       * @param arrows2 arrow count
-       * @returns A function
-       */
-    }, {
-      key: "arrow",
-      value: function arrow(arrows2) {
-        var t = this;
-        var arrows = new PowiainaNum(arrows2);
-        if (arrows.lt(PowiainaNum.ZERO)) {
-          console.warn("The arrow is <0 or not a integer, the returned function will return NaN.");
-          return function () {
-            if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-            return PowiainaNum.NaN;
-          };
-        }
-        if (!arrows.isInt()) {
-          return function (other) {
-            return arrowpsd(t, arrows, other);
-          };
-        }
-        if (arrows.eq(0)) return function (other) {
-          return t.mul(other);
-        };
-        if (arrows.eq(1)) return function (other) {
-          return t.pow(other);
-        };
-        if (arrows.eq(2)) return function (other) {
-          return t.tetrate(other);
-        };
-        return function (other2) {
-          var payload2 = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
-          var depth = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 0;
-          var other = new PowiainaNum(other2);
-          var payload = new PowiainaNum(payload2);
-          var ctt = PowiainaNum.arrowFuncMap.get("".concat(t.toString(), " ").concat(arrows.toString(), " ").concat(other.toString(), " ").concat(depth));
-          if (ctt) return ctt;
-          var res = function () {
-            var calcBase;
-            if (t.isNaN() || other.isNaN() || payload.isNaN()) return PowiainaNum.NaN;
-            if (other.lt(PowiainaNum.ZERO)) return PowiainaNum.NaN;
-            if (t.eq(PowiainaNum.ZERO)) {
-              if (other.eq(PowiainaNum.ONE)) return PowiainaNum.ZERO;
-              if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-              return PowiainaNum.NaN;
-            }
-            if (payload.neq(PowiainaNum.ONE)) other = other.add(payload.anyarrow_log(arrows)(t));
-            if (t.eq(PowiainaNum.ONE)) return PowiainaNum.ONE;
-            if (other.eq(PowiainaNum.ZERO)) return PowiainaNum.ONE;
-            if (other.eq(PowiainaNum.ONE)) return t;
-            // arrow > 9e15, that using 10{x}, x=arrow;
-            if (arrows.gt(PowiainaNum.MSI)) {
-              calcBase = arrows;
-              calcBase.setOperator(calcBase.getOperator(Infinity) + 1, Infinity);
-              return calcBase;
-            }
-            var arrowsNum = arrows.toNumber();
-            // arrow < 9e15
-            // 10{x}2 = 10{x-1}10
-            if (other.eq(2)) return t.arrow(arrowsNum - 1)(t, payload, depth + 1);
-            if (t.max(other).gt(PowiainaNum.arrowMSI(arrowsNum + 1))) return t.max(other);
-            if (t.gt(PowiainaNum.arrowMSI(arrowsNum)) || other.gt(MSI)) {
-              if (t.gt(PowiainaNum.arrowMSI(arrowsNum))) {
-                calcBase = t;
-                calcBase.setOperator(calcBase.getOperator(arrowsNum) - 1, arrowsNum);
-                calcBase.normalize();
-              } else if (t.gt(PowiainaNum.arrowMSI(arrowsNum - 1))) {
-                calcBase = new PowiainaNum(t.getOperator(arrowsNum - 1));
-              } else {
-                calcBase = PowiainaNum.ZERO;
-              }
-              var j = calcBase.add(other);
-              j.setOperator(j.getOperator(arrowsNum) + 1, arrowsNum);
-              j.normalize();
-              return j;
-            }
-            if (depth >= PowiainaNum.maxOps + 10) {
-              return new PowiainaNum({
-                small: false,
-                sign: 1,
-                layer: 0,
-                array: [newOperator(10, 0), newOperator(1, arrowsNum)]
-              });
-            }
-            var y = other.toNumber();
-            var f = Math.floor(y);
-            var arrows_m1 = arrows.sub(PowiainaNum.ONE);
-            //一般情况计算10{x}y, y-f是0. 因此calcBase会是1.
-            calcBase = t.arrow(arrows_m1)(y - f, payload, depth + 1);
-            var i = 0;
-            for (var m = PowiainaNum.arrowMSI(arrowsNum - 1); f !== 0 && calcBase.lt(m) && i < 100; i++) {
-              if (f > 0) {
-                calcBase = t.arrow(arrows_m1)(calcBase, payload, depth + 1);
-                --f;
-              }
-            }
-            if (i == 100) f = 0;
-            calcBase.setOperator(calcBase.getOperator(arrowsNum - 1) + f, arrowsNum - 1);
-            calcBase.normalize();
-            return calcBase;
-          }();
-          if (depth < PowiainaNum.maxOps + 10) {
-            PowiainaNum.arrowFuncMap.set("".concat(t.toString(), " ").concat(arrows.toString(), " ").concat(other.toString(), " ").concat(depth), res);
-          }
-          return res;
-        };
-      }
-    }, {
-      key: "anyarrow_log",
-      value:
-      /**
-       * return `base`{`arrow2`}`x` = `this` which `x` is.
-       *
-       * @param arrow2
-       * @returns
-       */
-      function anyarrow_log(arrow2) {
-        var x = this;
-        var arrow = new PowiainaNum(arrow2);
-        var arrowsNum = arrow.toNumber();
-        if (arrow.gt(MSI)) {
-          throw new Error(powiainaNumError + "Not implemented");
-        }
-        if (!arrow.isInt() || arrow.lt(0)) return function () {
-          if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-          return PowiainaNum.NaN;
-        };
-        if (arrow.eq(0)) return function (base) {
-          return x.div(base);
-        };
-        if (arrow.eq(1)) return function (base) {
-          return x.log(base);
-        };
-        if (arrow.eq(2)) return function (base) {
-          return x.slog(base);
-        };
-        if (x.isInfiNaN()) return function () {
-          return x;
-        };
-        return function (base) {
-          var depth = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
-          var b = new PowiainaNum(base);
-          if (b.isNaN()) return b;
-          if (b.isInfi()) return PowiainaNum.ZERO;
-          if (x.isZero()) return PowiainaNum.ONE;
-          if (x.eq(PowiainaNum.ONE)) return PowiainaNum.ZERO;
-          if (x.eq(b)) return PowiainaNum.ONE;
-          if (x.max(b).gt(PowiainaNum.arrowMSI(arrowsNum + 1))) {
-            if (x.gt(b)) return x;
-            return PowiainaNum.ZERO;
-          }
-          if (x.max(b).gt(PowiainaNum.arrowMSI(arrowsNum))) {
-            if (x.gt(b)) {
-              x.setOperator(x.getOperator(arrowsNum) - 1, arrowsNum);
-              x.normalize();
-              return x.sub(x.getOperator(arrowsNum - 1));
-            }
-          }
-          if (x.lt(PowiainaNum.ZERO)) {
-            if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-            return PowiainaNum.NaN;
-          }
-          // base^base^... = x? (? bases)
-          var r = 0;
-          // 计算x与base的差距
-          var distanceLayerOf = x.getOperator(arrowsNum) - b.getOperator(arrowsNum);
-          if (distanceLayerOf > 3) {
-            var l = distanceLayerOf - 3;
-            r += l;
-            x.setOperator(x.getOperator(arrowsNum) - l, arrowsNum);
-          }
-          // 假设b=3， x=1e19
-          for (var i = 0; i < 100; ++i) {
-            if (x.lt(PowiainaNum.ZERO)) {
-              x = x.arrow(arrowsNum - 1)(base);
-              --r;
-            } else if (x.lte(1)) {
-              return new PowiainaNum(r + x.toNumber() - 1);
-            } else {
-              // 第1-4次迭代，进入此处
-              ++r;
-              x = x.anyarrow_log(arrowsNum - 1)(base, depth + 1);
-            }
-          }
-          if (x.gt(10)) return new PowiainaNum(r);
-          if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-          return PowiainaNum.NaN;
-        };
-      }
-    }, {
-      key: "omega2log",
-      value: function omega2log() {
-        var bbase = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 10;
-        var EPSILON = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1e-6;
-        var target = this;
-        var dis = target.clone();
-        if (dis.isInfiNaN()) return dis;
-        if (dis.gte("10{1,3}e15.954589770191003")) return dis;
-        new PowiainaNum(bbase);
-        if (dis.getOperator(1 / 0, 2) >= 1) {
-          dis.setOperator(dis.getOperator(1 / 0) - 1, 1 / 0, 2, 1);
-          return dis;
-        }
-        // if (dis.layer >= 1) {
-        // dis.layer -= 1
-        // return dis
-        // } else
-        // // @ts-expect-error
-        // if (dis.arr01[dis.array.length - 1][0] >= 98) {
-        //   // @ts-expect-error
-        //   let zero = new PowiainaNum(dis.array[dis.arr01.length - 1][0]);
-        //   return zero;
-        // }
-        // else
-        if (target.lt(new PowiainaNum(bbase).expansionArrow(3)(2))) {
-          return new PowiainaNum(target).expansion_log2(3)(bbase);
-        }
-        // else {
-        //   let addTest = 8;
-        //   let target = 0;
-        //   while (addTest >= 10 ** -10) {
-        //     if (PowiainaNum.arrFrac(base, target + addTest).lte(dis)) {
-        //       target += addTest;
-        //     }
-        //     addTest /= 2;
-        //   }
-        //   return new PowiainaNum(target);
-        // }
-        if (bbase == 10) {
-          var clonedOperators = [];
-          for (var i = 0; i < target.array.length; i++) {
-            clonedOperators[i] = {
-              arrow: target.array[i].arrow,
-              expans: target.array[i].expans,
-              megota: target.array[i].megota,
-              repeat: target.array[i].repeat,
-              valuereplaced: target.array[i].valuereplaced
-            };
-          }
-          var _result2 = PowiainaNum.omegacollect(clonedOperators);
-          return new PowiainaNum(_result2[1].arrow - 1 + Math.log(_result2[0].repeat / 2) / Math.log(5));
-        }
-        var left = 2;
-        var right = 9007199254740991;
-        var result = NaN;
-        while (left <= right) {
-          var mid = Math.floor((left + right) / 2);
-          var comparison = PowiainaNum.arrw2Frac(bbase, mid).cmp(target);
-          if (comparison === 0) {
-            return new PowiainaNum(mid);
-          } else if (comparison < 0) {
-            result = mid;
-            left = mid + 1;
-          } else {
-            right = mid - 1;
-          }
-          if (Math.abs(left - right) <= EPSILON) {
-            return new PowiainaNum(mid);
-          }
-        }
-        return new PowiainaNum(result);
-        // if (dis.arr01[dis.array.length - 1][0] >= 98) {
-        //   // @ts-expect-error
-        //   let zero = new PowiainaNum(dis.array[dis.arr01.length - 1][0]);
-        //   return zero;
-        // } else if (target.lt(PowiainaNum.pentate(bbase, 2))) {
-        //   return new PowiainaNum(target).anyarrow_log(3)(bbase);
-        // } else {
-        //   let addTest = 8;
-        //   let target = 0;
-        //   while (addTest >= 10 ** -10) {
-        //     if (PowiainaNum.arrFrac(base, target + addTest).lte(dis)) {
-        //       target += addTest;
-        //     }
-        //     addTest /= 2;
-        //   }
-        //   return new PowiainaNum(target);
-        // }
-      }
-      /**
-       * base{height}base
-       */
-    }, {
-      key: "arrow_height_inverse",
-      value:
-      /**
-       * Arrow height inverse (ExpantaNum.js), an alias of `anyarrow_log`
-       * @param arrows
-       * @returns
-       */
-      function arrow_height_inverse(arrows) {
-        return this.anyarrow_log(arrows);
-      }
-      /**
-       * Arrow w2 height inverse, an alias of `expansion_log2`
-       * @param arrows
-       * @returns
-       */
-    }, {
-      key: "arrow_w2_height_inverse",
-      value: function arrow_w2_height_inverse(arrows) {
-        return this.expansion_log2(arrows);
-      }
-    }, {
-      key: "chain",
-      value: function chain(other, arrows) {
-        return this.arrow(arrows)(other);
-      }
-    }, {
-      key: "pentate",
-      value: function pentate(other, payload) {
-        return this.arrow(3)(other, payload);
-      }
-    }, {
-      key: "hexate",
-      value: function hexate(other, payload) {
-        return this.arrow(4)(other, payload);
-      }
-    }, {
-      key: "pent",
-      value: function pent(other, payload) {
-        return this.arrow(3)(other, payload);
-      }
-    }, {
-      key: "penta_log",
-      value: function penta_log() {
-        var base = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 10;
-        return this.anyarrow_log(3)(base);
-      }
-    }, {
-      key: "expansion",
-      value:
-      /**
-       * Expansion, which is `this`{{1}}`other2`.
-       *
-       * Expansion refers to the binary function a{{1}}b = a{a{...a{b}a...}a}a where there are b a's from the center out. It is {a,b,1,2} in BEAF and a{X+1}b in X-Sequence Hyper-Exponential Notation. The notation a{c}b means {a,b,c}, which is a "c + 2"-ated to b, using the bracket operator.
-       *
-       * @url https://googology.fandom.com/wiki/Expansion
-       */
-      function expansion(other2) {
-        var other = new PowiainaNum(other2);
-        var t = this;
-        if (other.lt(PowiainaNum.ZERO)) return PowiainaNum.NaN;
-        if (other.eq(PowiainaNum.ONE)) return this;
-        if (this.eq(PowiainaNum.ONE)) return PowiainaNum.ONE;
-        if (this.eq(2)) return new PowiainaNum(4);
-        if (other.eq(0)) return PowiainaNum.ONE;
-        if (other.gt(0) && other.lt(1) && !other.isInt()) {
-          return t.pow(other);
-        }
-        if (other.gt(1) && other.lt(2) && !other.isInt()) {
-          var _y = other.sub(1).pow_base(t);
-          if (_y.lt(2)) return PowiainaNum.arrow(t, 3, _y);
-          return PowiainaNum.arrFrac(t, _y);
-        }
-        var calcBase;
-        // I don't know is this added partrs work correctly...
-        if (t.gt("10{1,2}".concat(MSI)) || other.gt(MSI)) {
-          if (t.gt("10{1,2}".concat(MSI))) {
-            calcBase = t.clone();
-            calcBase.setOperator(calcBase.getOperator(1, 2) - 1, 1, 2);
-            calcBase.normalize();
-          } else if (t.gt("10{".concat(MSI, "}10"))) {
-            calcBase = new PowiainaNum(t.getOperator(Infinity));
-          } else {
-            calcBase = PowiainaNum.ZERO;
-          }
-          var j = calcBase.add(other);
-          j.setOperator(j.getOperator(1, 2) + 1, 1, 2);
-          j.normalize();
-          return j;
-        }
-        var y = other.toNumber() - 1;
-        var f = Math.floor(y);
-        calcBase = PowiainaNum.expansion(t, 1 + y - f);
-        var i = 0;
-        for (var m = new PowiainaNum("10{1,2}e15.954589770191003"); f !== 0 && calcBase.lt(m) && i < 100; i++) {
-          if (f > 0) {
-            calcBase = PowiainaNum.arrFrac(t, calcBase);
-            --f;
-          }
-        }
-        calcBase.setOperator(calcBase.getOperator(Infinity) + f, Infinity);
-        calcBase.normalize();
-        return calcBase;
-      }
-    }, {
-      key: "expansionArrow",
-      value: function expansionArrow(arrow2) {
-        var arrow = new PowiainaNum(arrow2);
-        var t = this;
-        if (arrow.lt(0) || !arrow.isInt()) return function () {
-          if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-          return PowiainaNum.NaN;
-        };
-        if (arrow.eq(0)) return function (other) {
-          return t.arrow(other)(t);
-        };
-        if (arrow.eq(1)) return function (other) {
-          return t.expansion(other);
-        };
-        var arrows = arrow;
-        return function (other2) {
-          var depth = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
-          var other = new PowiainaNum(other2);
-          var r;
-          if (t.isNaN() || other.isNaN()) return PowiainaNum.NaN;
-          if (other.lt(PowiainaNum.ZERO)) {
-            if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-            return PowiainaNum.NaN;
-          }
-          if (t.eq(PowiainaNum.ZERO)) {
-            if (other.eq(PowiainaNum.ONE)) return PowiainaNum.ZERO;
-            if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-            return PowiainaNum.NaN;
-          }
-          if (t.eq(PowiainaNum.ONE)) return PowiainaNum.ONE;
-          if (other.eq(PowiainaNum.ZERO)) return PowiainaNum.ONE;
-          if (other.eq(PowiainaNum.ONE)) return t;
-          // arrow > 9e15, that using 10{x,2}, x=arrow;
-          if (arrows.gt(PowiainaNum.MSI)) {
-            r = arrows;
-            r.setOperator(r.getOperator(Infinity, 2) + 1, Infinity, 2);
-            return r;
-          }
-          var arrowsNum = arrows.toNumber();
-          // arrow < 9e15
-          // 10{x}2 = 10{x-1}10
-          if (other.eq(2)) return t.expansionArrow(arrowsNum - 1)(t, depth + 1);
-          if (t.max(other).gt("10{".concat(arrowsNum + 1, ",2}").concat(MSI))) return t.max(other);
-          if (t.gt("10{".concat(arrowsNum, ",2}").concat(MSI)) || other.gt(MSI)) {
-            if (t.gt("10{".concat(arrowsNum, ",2}").concat(MSI))) {
-              r = t.clone();
-              r.setOperator(r.getOperator(arrowsNum, 2) - 1, arrowsNum, 2);
-              r.normalize();
-            } else if (t.gt("10{".concat(arrowsNum - 1, ",2}").concat(MSI))) {
-              r = new PowiainaNum(t.getOperator(arrowsNum - 1, 2));
-            } else {
-              r = PowiainaNum.ZERO;
-            }
-            var j = r.add(other);
-            j.setOperator(j.getOperator(arrowsNum, 2) + 1, arrowsNum, 2);
-            j.normalize();
-            return j;
-          }
-          if (depth >= PowiainaNum.maxOps + 10) {
-            return new PowiainaNum({
-              small: false,
-              sign: 1,
-              layer: 0,
-              array: [newOperator(10, 0), newOperator(1, arrowsNum, 2)]
-            });
-          }
-          var y = other.toNumber();
-          var f = Math.floor(y);
-          var arrows_m1 = arrows.sub(PowiainaNum.ONE);
-          r = t.expansionArrow(arrows_m1)(y - f, depth + 1);
-          var i = 0;
-          for (var m = new PowiainaNum("10{".concat(arrowsNum - 1, ",2}").concat(MSI)); f !== 0 && r.lt(m) && i < 100; i++) {
-            if (f > 0) {
-              r = t.expansionArrow(arrows_m1)(r, depth + 1);
-              --f;
-            }
-          }
-          if (i == 100) f = 0;
-          r.setOperator(r.getOperator(arrowsNum - 1, 2) + f, arrowsNum - 1, 2);
-          r.normalize();
-          return r;
-        };
-      }
-    }, {
-      key: "expansion_log_inner",
-      value: function expansion_log_inner(base2) {
-        var t = this;
-        var base = new PowiainaNum(base2);
-        if (base.eq(2) && t.gt(4)) return PowiainaNum.NaN;
-        if (t.gte("10{2,2}".concat(MSI))) {
-          return t;
-        }
-        if (t.gte("10{1,2}".concat(MSI))) {
-          t.setOperator(t.getOperator(1, 2) - 1, 1, 2);
-          return t;
-        }
-        var r = 0;
-        var x = t;
-        var morexxxoperators = 0;
-        if (x.getOperator(1 / 0) >= 10) {
-          morexxxoperators = x.getOperator(1 / 0) - 10;
-          x.setOperator(10, 1 / 0);
-        }
-        for (var i = 0; i < 100; ++i) {
-          if (x.lt(PowiainaNum.ZERO)) {
-            x = PowiainaNum.arrFrac(base, x);
-            --r;
-          } else if (x.lte(1)) {
-            return new PowiainaNum(r + x.toNumber() - 1 + morexxxoperators);
-          } else {
-            // 第1-4次迭代，进入此处
-            ++r;
-            x = x.omegalog(base.toNumber());
-          }
-        }
-        if (x.gt(10)) return new PowiainaNum(r + morexxxoperators);
-        return x.add(morexxxoperators);
-      }
-      /**
-       * return `base`{{`arrow2`}}`x` = `this` which `x` is.
-       *
-       * @param arrow2
-       * @returns
-       */
-    }, {
-      key: "expansion_log2",
-      value: function expansion_log2(arrow2) {
-        var x = this.clone();
-        var arrow = new PowiainaNum(arrow2);
-        var arrowsNum = arrow.toNumber();
-        if (arrow.gt(MSI)) {
-          throw new Error(powiainaNumError + "Not implemented");
-        }
-        if (!arrow.isInt() || arrow.lt(1)) return function () {
-          if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-          return PowiainaNum.NaN;
-        };
-        if (arrow.eq(1)) return function (base) {
-          return x.expansion_log_inner(base);
-        };
-        if (x.isInfiNaN()) return function () {
-          return x;
-        };
-        return function (base) {
-          var depth = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
-          var b = new PowiainaNum(base);
-          if (b.isNaN()) return b;
-          if (b.isInfi()) return PowiainaNum.ZERO;
-          if (x.isZero()) return PowiainaNum.ONE;
-          if (x.eq(PowiainaNum.ONE)) return PowiainaNum.ZERO;
-          if (x.eq(b)) return PowiainaNum.ONE;
-          if (x.max(b).gt(PowiainaNum.arrowexpansMSI(arrowsNum + 1))) {
-            if (x.gt(b)) return x;
-            return PowiainaNum.ZERO;
-          }
-          if (x.max(b).gt(PowiainaNum.arrowexpansMSI(arrowsNum))) {
-            if (x.gt(b)) {
-              x.setOperator(x.getOperator(arrowsNum, 2) - 1, arrowsNum, 2);
-              x.normalize();
-              return x.sub(x.getOperator(arrowsNum - 1, 2));
-            }
-          }
-          if (x.lt(PowiainaNum.ZERO)) {
-            if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-            return PowiainaNum.NaN;
-          }
-          // base^base^... = x? (? bases)
-          var r = 0;
-          // 计算x与base的差距
-          var distanceLayerOf = x.getOperator(arrowsNum, 2) - b.getOperator(arrowsNum, 2);
-          if (distanceLayerOf > 3) {
-            var l = distanceLayerOf - 3;
-            r += l;
-            x.setOperator(x.getOperator(arrowsNum, 2) - l, arrowsNum, 2);
-          }
-          // 假设b=3， x=1e19
-          for (var i = 0; i < 100; ++i) {
-            if (x.lt(PowiainaNum.ZERO)) {
-              x = x.expansionArrow(arrowsNum - 1)(base);
-              --r;
-            } else if (x.lte(1)) {
-              return new PowiainaNum(r + x.toNumber() - 1);
-            } else {
-              // 第1-4次迭代，进入此处
-              ++r;
-              x = x.expansion_log2(arrowsNum - 1)(base, depth + 1);
-            }
-          }
-          if (x.gt(10)) return new PowiainaNum(r);
-          if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-          return PowiainaNum.NaN;
-        };
-      }
-    }, {
-      key: "multiExpansion",
-      value: function multiExpansion(other) {
-        return this.expansionArrow(2)(other);
-      }
-    }, {
-      key: "powerExpansion",
-      value: function powerExpansion(other) {
-        return this.expansionArrow(3)(other);
-      }
-    }, {
-      key: "explosion",
-      value: function explosion(other) {
-        return PowiainaNum.BEAF(this, other, 1, 3);
-      }
-    }, {
-      key: "megotion",
-      value: function megotion(other) {
-        return PowiainaNum.BEAF(this, other, 1, 1, 2);
-      }
-    }, {
-      key: "powiaination",
-      value: function powiaination(other) {
-        return PowiainaNum.BEAF(this, other, 1, 1, 1, 2);
-      }
-    }, {
-      key: "abs",
-      value:
-      //#endregion
-      //#region comparsion
-      function abs() {
-        var obj = this.clone();
-        if (obj.sign < 0) obj.sign *= -1;
-        return obj;
-      }
-    }, {
-      key: "clampMin",
-      value:
-      /**
-       * Restrict a number be not lower than a number
-       *
-       * It's also an alias of `PowiainaNum.max`.
-       * @returns restricted number
-       */
-      function clampMin() {
-        for (var _len2 = arguments.length, args = new Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
-          args[_key2] = arguments[_key2];
-        }
-        return PowiainaNum.max.apply(PowiainaNum, [this].concat(args));
-      }
-      /**
-       * Restrict a number be not higher than a number
-       *
-       * It's also an alias of `PowiainaNum.min`.
-       * @returns restricted number
-       */
-    }, {
-      key: "clampMax",
-      value:
-      /**
-       * Restrict a number be not higher than a number
-       *
-       * It's also an alias of `PowiainaNum.min`.
-       * @returns restricted number
-       */
-      function clampMax() {
-        for (var _len3 = arguments.length, args = new Array(_len3), _key3 = 0; _key3 < _len3; _key3++) {
-          args[_key3] = arguments[_key3];
-        }
-        return PowiainaNum.min.apply(PowiainaNum, [this].concat(args));
-      }
-      /**
-       * A combination of minimum and maximum: the value returned by clamp is normally 'this', but it won't go below 'min' and it won't go above 'max'.
-       * Therefore, if 'this' < 'min', then 'min' is returned, and if 'this' > 'max', then 'max' is returned.
-       */
-    }, {
-      key: "clamp",
-      value: function clamp(min, max) {
-        return this.max(min).min(max);
-      }
-    }, {
-      key: "max",
-      value: function max() {
-        for (var _len4 = arguments.length, args = new Array(_len4), _key4 = 0; _key4 < _len4; _key4++) {
-          args[_key4] = arguments[_key4];
-        }
-        return PowiainaNum.max.apply(PowiainaNum, [this].concat(args));
-      }
-    }, {
-      key: "min",
-      value: function min() {
-        for (var _len5 = arguments.length, args = new Array(_len5), _key5 = 0; _key5 < _len5; _key5++) {
-          args[_key5] = arguments[_key5];
-        }
-        return PowiainaNum.min.apply(PowiainaNum, [this].concat(args));
-      }
-      /**
-       * Compare what PowiainaNum's absolute value is max
-       * @param args
-       * @returns absolute value max number's absolute value
-       */
-    }, {
-      key: "maxabs",
-      value: function maxabs() {
-        for (var _len6 = arguments.length, args = new Array(_len6), _key6 = 0; _key6 < _len6; _key6++) {
-          args[_key6] = arguments[_key6];
-        }
-        var other = args.map(function (x) {
-          return new PowiainaNum(x).abs();
-        });
-        return PowiainaNum.max.apply(PowiainaNum, [this.abs()].concat(_toConsumableArray(other)));
-      }
-    }, {
-      key: "minabs",
-      value: function minabs() {
-        for (var _len7 = arguments.length, args = new Array(_len7), _key7 = 0; _key7 < _len7; _key7++) {
-          args[_key7] = arguments[_key7];
-        }
-        var other = args.map(function (x) {
-          return new PowiainaNum(x).abs();
-        });
-        return PowiainaNum.min.apply(PowiainaNum, [this.abs()].concat(_toConsumableArray(other)));
-      }
-    }, {
-      key: "cmpabs",
-      value: function cmpabs(x) {
-        var other = new PowiainaNum(x).abs();
-        return this.abs().cmp(other);
-      }
-      /**
-       * -1: `this` is smaller
-       * 0: equals
-       * 1: `x` is smaller
-       * 2: NaN
-       */
-    }, {
-      key: "compare",
-      value: function compare(x) {
-        var other = new PowiainaNum(x);
-        if (this.isNaN() || other.isNaN()) return 2;
-        if (this.sign < other.sign) return -1;
-        if (this.sign > other.sign) return 1;
-        var t = this;
-        //this.sign = other.sign
-        var allneg = this.sign == -1 && other.sign == -1;
-        if (this.small && !other.small) return -1 * (allneg ? -1 : 1);
-        if (other.small && !this.small) return 1 * (allneg ? -1 : 1);
-        var resultreverse = 1;
-        if (this.small && other.small) resultreverse *= -1;
-        if (allneg) resultreverse *= -1;
-        var result = 0;
-        for (var i = 0; this.array.length - 1 - i >= 0 && other.array.length - 1 - i >= 0; i++) {
-          var op1 = this.array[this.array.length - 1 - i];
-          var op2 = other.array[other.array.length - 1 - i];
-          if (op1.repeat === Infinity && op2.repeat === Infinity) {
-            if (t.small === other.small) return 0;
-            return other.small ? 1 : -1;
-          }
-          if (op1.repeat === Infinity) {
-            result = 1;
-            break;
-          }
-          if (op2.repeat === Infinity) {
-            result = -1;
-            break;
-          }
-          var cmp = compareTuples([op1.megota, op1.expans, op1.arrow, op1.repeat], [op2.megota, op2.expans, op2.arrow, op2.repeat]);
-          if (cmp == 1) {
-            result = 1;
-            break;
-          } else if (cmp == -1) {
-            result = -1;
-            break;
-          }
-        }
-        return result * resultreverse + 1 - 1;
-      }
-    }, {
-      key: "cmp",
-      value: function cmp(other) {
-        return this.compare(other);
-      }
-    }, {
-      key: "eq",
-      value: function eq(other) {
-        return this.cmp(other) === 0;
-      }
-    }, {
-      key: "neq",
-      value: function neq(other) {
-        return this.cmp(other) !== 0;
-      }
-    }, {
-      key: "lt",
-      value: function lt(other) {
-        return this.cmp(other) === -1;
-      }
-    }, {
-      key: "lte",
-      value: function lte(other) {
-        return this.cmp(other) <= 0;
-      }
-    }, {
-      key: "gt",
-      value: function gt(other) {
-        return this.cmp(other) == 1;
-      }
-    }, {
-      key: "gte",
-      value: function gte(other) {
-        var t = this.cmp(other);
-        return t == 0 || t == 1;
-      }
-    }, {
-      key: "equals",
-      value: function equals(other) {
-        return this.eq(other);
-      }
-    }, {
-      key: "notEquals",
-      value: function notEquals(other) {
-        return this.neq(other);
-      }
-    }, {
-      key: "eq_tolerance",
-      value: function eq_tolerance(value) {
-        var tolerance = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1e-7;
-        var dec = new PowiainaNum(value);
-        return this.sub(dec).lte(this.max(dec).mul(tolerance));
-      }
-      //#endregion
-      //#region geometry
-      /**this function is indistinguishable above 4503599627370496*/
-    }, {
-      key: "sin",
-      value: function sin() {
-        var x = this;
-        if (x.isneg()) {
-          return x.neg().sin().neg();
-        }
-        var y = x.mod(7074237752028440);
-        return PowiainaNum.fromNumber(Math.sin(y.toNumber()));
-      }
-    }, {
-      key: "cos",
-      value: function cos() {
-        return this.sub(Math.PI / 2).sin();
-      }
-    }, {
-      key: "tan",
-      value: function tan() {
-        return this.sin().div(this.cos());
-      }
-    }, {
-      key: "cot",
-      value: function cot() {
-        return this.cos().div(this.sin());
-      }
-    }, {
-      key: "sec",
-      value: function sec() {
-        return this.cos().rec();
-      }
-    }, {
-      key: "csc",
-      value: function csc() {
-        return this.sin().rec();
-      }
-      //#endregion
-      //#region neg, rec, floor, ceil, round, trunc, sign
-    }, {
-      key: "neg",
-      value: function neg() {
-        var a = this.clone();
-        a.sign *= -1;
-        a.normalize();
-        return a;
-      }
-    }, {
-      key: "rec",
-      value: function rec() {
-        var a = this.clone();
-        a.small = !a.small;
-        return a;
-      }
-    }, {
-      key: "recip",
-      value: function recip() {
-        return this.rec();
-      }
-    }, {
-      key: "reciprocate",
-      value: function reciprocate() {
-        return this.rec();
-      }
-    }, {
-      key: "floor",
-      value: function floor() {
-        if (this.isInt()) return this;
-        if (this.small) {
-          if (this.sign == 1) return PowiainaNum.ZERO;else return PowiainaNum.ONE.neg();
-        }
-        var r = this.abs();
-        r.array[0].repeat = Math[this.sign == 1 ? "floor" : "ceil"](r.getOperator(0));
-        r.sign = this.sign;
-        return r;
-      }
-    }, {
-      key: "ceil",
-      value: function ceil() {
-        if (this.isInt()) return this;
-        if (this.small) {
-          if (this.sign == 1) return PowiainaNum.ONE;else return PowiainaNum.ZERO;
-        }
-        var r = this.abs();
-        r.array[0].repeat = Math[this.sign == 1 ? "ceil" : "floor"](r.getOperator(0));
-        r.sign = this.sign;
-        return r;
-      }
-    }, {
-      key: "round",
-      value: function round() {
-        if (this.isInt()) return this;
-        if (this.small) {
-          if (this.sign == 1) {
-            if (this.rec().lte(2)) return PowiainaNum.ONE;else return PowiainaNum.ZERO;
-          } else {
-            if (this.abs().rec().lte(2)) return PowiainaNum.ZERO;else return PowiainaNum.ONE.neg();
-          }
-        }
-        var r = this.abs();
-        r.array[0].repeat = Math.round(r.array[0].repeat);
-        r.sign = this.sign;
-        return r;
-      }
-    }, {
-      key: "trunc",
-      value:
-      /**
-       * Work like `Math.trunc`,
-       *
-       * if `this > 0`, return `floor(this)`
-       *
-       * if `this < 0`, return `ceil(this)`
-       *
-       * @example
-       * new PowiainaNum(3.3).trunc() == new PowiainaNum(3)
-       * new PowiainaNum(-1.114514).trunc() == new PowiainaNum(-1)
-       * @returns
-       */
-      function trunc() {
-        var y = this;
-        return y.gte(0) ? y.floor() : y.ceil();
-      }
-    }, {
-      key: "isNaN",
-      value: function (_isNaN) {
-        function isNaN() {
-          return _isNaN.apply(this, arguments);
-        }
-        isNaN.toString = function () {
-          return _isNaN.toString();
-        };
-        return isNaN;
-      }(
-      //#endregion
-      //#region judge-numbers
-      function () {
-        return isNaN(this.array[0].repeat);
-      })
-    }, {
-      key: "isZero",
-      value: function isZero() {
-        return Boolean(this.small && !isFinite(this.array[0].repeat));
-      }
-    }, {
-      key: "isFinite",
-      value: function (_isFinite) {
-        function isFinite() {
-          return _isFinite.apply(this, arguments);
-        }
-        isFinite.toString = function () {
-          return _isFinite.toString();
-        };
-        return isFinite;
-      }(function () {
-        return Boolean(this.small || isFinite(this.array[0].repeat)) && !this.isNaN();
-      })
-    }, {
-      key: "isInfi",
-      value: function isInfi() {
-        return this.rec().isZero();
-      }
-    }, {
-      key: "isInfiNaN",
-      value: function isInfiNaN() {
-        return this.isInfi() || this.isNaN();
-      }
-    }, {
-      key: "isInt",
-      value: function isInt() {
-        if (this.isZero()) return true;
-        if (!this.small && Number.isInteger(this.array[0].repeat)) return true;
-        if (this.abs().gte(MSI / 2)) return true;
-        return false;
-      }
-    }, {
-      key: "ispos",
-      value: function ispos() {
-        return this.sign > 0;
-      }
-    }, {
-      key: "isneg",
-      value: function isneg() {
-        return this.sign < 0;
-      }
-    }, {
-      key: "getOperatorIndex",
-      value:
-      /**
-       * @returns number will return the index of the operator in array. return as x.5 if it's between the xth and x+1th operators.
-       */
-      function getOperatorIndex(arrow) {
-        var expans = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
-        var megota = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
-        return PowiainaNum.opGetOperatorIndex(this.array, arrow, expans, megota);
-      }
-      /**
-       * @returns number repeats of operators with given arguments.
-       */
-    }, {
-      key: "getOperator",
-      value:
-      /**
-       * @returns number repeats of operators with given arguments.
-       */
-      function getOperator(arrow) {
-        var expans = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
-        var megota = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
-        return PowiainaNum.opGetOperator(this.array, arrow, expans, megota);
-      }
-      /**
-       * Modify the repeat of operator(argument will modified)
-       * @param number val the repeat of operator will modify to array.
-       * @returns bool Is the operators array changed?
-       */
-    }, {
-      key: "setOperator",
-      value:
-      /**
-       * Modify the repeat of operator
-       * @param number val the repeat of operator will modify to array.
-       * @returns bool Is the operators array changed?
-       */
-      function setOperator(val, arrow) {
-        var expans = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
-        var megota = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 1;
-        return PowiainaNum.opSetOperator(this.array, val, arrow, expans, megota);
-      }
-      //#endregion
-      //#region converters
-      /**
-       * Convert `this` to Javascript `number`
-       *
-       * returns `Infinity` when the number is greater than `Number.MAX_VALUE`
-       */
-    }, {
-      key: "toNumber",
-      value: function toNumber() {
-        if (this.sign == -1) return -this.neg().toNumber();
-        if (this.small) return 1 / this.rec().toNumber();
-        if (this.gte("e308.25471555991675")) return Infinity;
-        if (this.array.length == 1) return this.array[0].repeat;else if (this.array.length == 2 && this.array[1].arrow == 1 && this.array[1].expans == 1 && this.array[1].megota == 1 && this.array[1].repeat == 1) return Math.pow(10, this.array[0].repeat);
-        return NaN;
-      }
-      /**
-       * Convert `this` to a string
-       */
-    }, {
-      key: "toString_core",
-      value: function toString_core() {
-        if (this.isNaN()) return "NaN";
-        if (this.sign == -1) return "-".concat(this.neg().toString());
-        if (this.small) {
-          if (this.isZero()) return "0";
-          return "/".concat(this.rec().toString());
-        }
-        if (this.isInfi()) return "Infinity";
-        // P^a (10{arrow,expans,megota})^repeation base
-        var res = "";
-        if (!this.layer) res += "";else if (this.layer < 3) res += "P".repeat(this.layer);else res += "P^" + this.layer + " ";
-        for (var i = this.array.length - 1; i >= 0; i--) {
-          var oper = this.array[i];
-          var calc = "10{".concat(oper.arrow === Infinity ? "!" : oper.arrow).concat(oper.expans > 1 || oper.megota > 1 ? ",".concat(oper.expans === Infinity ? "!" : oper.expans) : "").concat(oper.megota > 1 ? ",".concat(oper.megota) : "", "}");
-          if (oper.arrow == 1 && oper.expans == 1 && oper.megota == 1 && oper.repeat < 5) {
-            calc = "e".repeat(oper.repeat);
-          } else if (oper.arrow == 0 && oper.expans == 1 && oper.megota == 1) {
-            calc = oper.repeat.toString();
-          } else if (oper.repeat > 1) {
-            calc = "(".concat(calc, ")^").concat(oper.repeat, " ");
-          } else {
-            calc = "".concat(calc);
-          }
-          res += "".concat(calc);
-        }
-        return res;
-      }
-    }, {
-      key: "toString",
-      value: function toString() {
-        try {
-          return this.toString_core();
-        } catch (_a) {
-          console.error("Checked error when converting to string");
-          return "NaN";
-        }
-      }
-    }, {
-      key: "toJSON",
-      value:
-      /**
-       * Convert `this` to a JSON object
-       * @returns a JSON object
-       */
-      function toJSON() {
-        return "PN" + this.toString();
-      }
-    }, {
-      key: "arr01",
-      get:
-      /**
-       * A property array value for version 0.1.x PowiainaNum.
-       */
-      function get() {
-        var res = [0];
-        for (var i = 0; i < this.array.length; i++) {
-          if (i == 0) res[0] = this.array[i].repeat;else {
-            // @ts-ignore
-            res[i] = [0, 0, 0, 0];
-            // @ts-ignore
-            res[i][0] = this.array[i].arrow == Infinity ? "x" : this.array[i].arrow;
-            // @ts-ignore
-            res[i][1] = this.array[i].repeat;
-            // @ts-ignore
-            res[i][2] = this.array[i].expans == Infinity ? "x" : this.array[i].expans;
-            // @ts-ignore
-            res[i][3] = this.array[i].megota;
-          }
-        }
-        return res;
-      }
-      //#endregion
-      //#region useless functions
-      /**
-       * This function is for NaNe308, if you want to calculate G(x), use this function directly.
-       */
-    }, {
-      key: "normalize",
-      value:
-      //#endregion
-      //#region other functions
-      /**
-       * Normalize functions will make this number convert into standard format.(it also change `this`, like [].sort)
-       * @returns normalized number
-       */
-      function normalize() {
-        //TODO: normalize
-        var renormalize = true;
-        var x = this;
-        if (this.array === undefined) {
-          x.array = [newOperator(NaN, 0, 1, 1)];
-        }
-        if (this.sign === undefined) this.sign = 0;
-        if (this.layer === undefined) this.layer = 0;
-        for (var i = 0; i < this.array.length; i++) {
-          // Check what is infinity
-          if (this.array[i].repeat == Infinity) {
-            this.array = [{
-              arrow: 0,
-              expans: 1,
-              megota: 1,
-              repeat: Infinity
-            }];
-            this.layer = 0;
-            return this;
-          }
-        }
-        for (var _i = 1; _i < x.array.length; ++_i) {
-          var e = x.array[_i];
-          if (e.arrow === null || e.arrow === undefined) {
-            e.arrow = 0;
-          }
-          if (e.expans === null || e.expans === undefined) {
-            e.expans = 1;
-          }
-          if (e.megota === null || e.megota === undefined) {
-            e.megota = 1;
-          }
-          if (isNaN(e.arrow) || isNaN(e.repeat) || isNaN(e.expans) || isNaN(e.megota)) {
-            x.array = [newOperator(NaN, 0, 1, 1)];
-            return x;
-          }
-          if (!isFinite(e.repeat) || !isFinite(e.megota)) {
-            x.array = [newOperator(Infinity, 0, 1, 1)];
-            return x;
-          }
-          if (!Number.isInteger(e.arrow)) e.arrow = Math.floor(e.arrow);
-          if (!Number.isInteger(e.repeat)) e.repeat = Math.floor(e.repeat);
-          if (!Number.isInteger(e.expans)) e.expans = Math.floor(e.expans);
-          if (!Number.isInteger(e.megota)) e.megota = Math.floor(e.megota);
-        }
-        if (!x.array.length) {
-          x.small = !x.small;
-          x.array = [newOperator(Infinity)]; // if no array set zero
-        }
-        do {
-          renormalize = false;
-          // Sort arrays.
-          this.array.sort(arraySortFunction);
-          for (var _i2 = 1; _i2 < x.array.length - 1; ++_i2) {
-            var q = x.array[_i2];
-            var r = x.array[_i2 + 1];
-            if (q.arrow == r.arrow && q.expans == r.expans && q.megota == r.megota) {
-              // same array's merge
-              q.repeat += r.repeat;
-              x.array.splice(_i2 + 1, 1);
-              --_i2;
-              renormalize = true;
-            }
-          }
-          for (var _i3 = 1; _i3 < x.array.length; ++_i3) {
-            var b = x.array[_i3];
-            // If there is a 0 repeat operator, remove it.
-            if (b.arrow !== 0 && (b.repeat === 0 || b.repeat === null || b.repeat === undefined)) {
-              x.array.splice(_i3, 1);
-              --_i3;
-              continue;
-            }
-            // If there is a operator which arrow 0 and brace count >=2
-            // replace it as arrow replacement operaotr
-            if (b.arrow == 0 && b.expans >= 2) {
-              b.arrow = Infinity;
-              b.valuereplaced = 0;
-              b.expans = b.expans - 1;
-            }
-          }
-          // for any (10{1,2})x, x< MSI turn into:
-          // if x = 0 , it's 1
-          // if x = 1, it's 10
-          // if x = 2, it's 10{10}10
-          // if x >= 3, it's 10{!}^x-2 10
-          // (10{x})^x 10
-          if (x.array.length >= 2 && x.array[0].repeat < MSI && x.array[1].arrow == 1 && x.array[1].expans >= 2) {
-            if (x.array[0].repeat == 0) {
-              x.array.splice(0, 1, newOperator(1));
-              x.array[1].repeat--;
-            } else if (x.array[0].repeat == 1) {
-              x.array.splice(0, 1, newOperator(10));
-              x.array[1].repeat--;
-            } else if (x.array[0].repeat == 2) {
-              x.array.splice(0, 1, newOperator(10), newOperator(10, 10, x.array[1].expans - 1, x.array[1].megota));
-              x.array[2].repeat--;
-            } else {
-              x.array.splice(0, 1, newOperator(10), newOperator(10, 10, x.array[1].expans - 1, x.array[1].megota), newOperator(x.array[0].repeat - 2, 1 / 0, x.array[1].expans - 1, x.array[1].megota));
-              x.array[2].repeat--;
-            }
-            // x.array[1].arrow = 1;
-            // x.array[1].expans++;
-            // x.array[0].repeat = x.array[1].repeat;
-            // x.array[1].repeat = 1;
-            renormalize = true;
-          }
-          if (x.array.length > PowiainaNum.maxOps) x.array.splice(1, x.array.length - PowiainaNum.maxOps); // max operators check
-          // for any 10^a but a <log10(MSI), replace to regular 10^a
-          if (this.array.length >= 2 && this.array[1].arrow == 1 && this.array[1].repeat >= 1 && this.array[0].repeat < MSI_LOG10) {
-            this.setOperator(this.array[1].repeat - 1, 1);
-            this.setOperator(Math.pow(10, this.array[0].repeat), 0);
-            renormalize = true;
-          }
-          // for any a but a > MSI, replace to 10^a.
-          if (this.array[0].repeat > MSI && isFinite(this.array[0].repeat)) {
-            this.setOperator(this.getOperator(1) + 1, 1);
-            this.setOperator(Math.log10(this.array[0].repeat), 0);
-            renormalize = true;
-          }
-          // if an operator megota > MSI, layer++
-          if (this.array[this.array.length - 1].megota > MSI) {
-            this.layer++;
-            this.array = [newOperator(this.array[this.array.length - 1].megota)];
-            renormalize = true;
-          } else if (this.layer && this.array.length == 1 && this.array[0].arrow === 0) {
-            this.layer--;
-            this.array = [newOperator(10), newOperator(1, 10, 10, this.array[0].repeat)];
-            renormalize = true;
-          }
-          // for a<1, turn into reciprocate
-          if (this.array.length == 1 && this.array[0].repeat < 1) {
-            this.array[0].repeat = 1 / this.array[0].repeat;
-            this.small = !this.small;
-            renormalize = true;
-          }
-          // for a = 1, small should false.
-          if (this.array.length == 1 && this.array[0].repeat == 1 && this.small) {
-            this.small = false;
-            renormalize = true;
-          }
-          // for any 10{!}^t x, replace to 10{!}^t-1 10{x}10
-          if (this.array.length >= 2 && !isFinite(this.array[1].arrow)) {
-            if (this.array[1].repeat > 1) {
-              this.array.push(newOperator(this.array[1].repeat - 1, 1 / 0, this.array[1].expans, this.array[1].megota));
-              this.array[1].repeat = 1;
-              this.array[1].arrow = this.array[0].repeat;
-              this.array[0].repeat = 10;
-            } else {
-              this.array[1].arrow = this.array[0].repeat;
-              this.array[0].repeat = 10;
-            }
-          }
-          // for any 10{X>9e15}10 finite, replace into 10{!}X;
-          if (this.array.length >= 2 && this.array[1].arrow >= MSI && isFinite(this.array[1].arrow)) {
-            this.array[0].repeat = this.array[1].arrow;
-            this.array[1] = newOperator(1, Infinity, this.array[1].expans, this.array[1].megota);
-          }
-          // for any (10{y=finite>=2})^z x x<9e15, convert to (10{y})^(z-1) (10{y-1}^(x-1) 10)
-          if (this.array.length >= 2 && this.array[1].arrow >= 2 && this.array[0].repeat < MSI && isFinite(this.array[1].arrow)) {
-            var _x2 = this.array[0].repeat;
-            var y = this.array[1].arrow;
-            var z = this.array[1].repeat;
-            this.array[0].repeat = 10;
-            this.array.splice(2, 0, newOperator(z - 1, y, this.array[1].expans, this.array[1].megota));
-            this.array[1] = newOperator(_x2 - 1, y - 1, this.array[1].expans, this.array[1].megota);
-          }
-          while (x.array.length >= 2 && x.array[0].repeat == 1 && x.array[1].repeat) {
-            // for any 10{X}10{X} 1, turn into 10{X}10
-            // [1, [R=sth, A=sth, E=sth, M=sth]]
-            if (x.array[1].repeat > 1) {
-              x.array[1].repeat--;
-            } else {
-              x.array.splice(1, 1);
-            }
-            x.array[0].repeat = 10;
-            renormalize = true;
-          }
-          if (x.array.length >= 2 && x.array.length < PowiainaNum.maxOps && x.array[0].repeat < MSI && x.array[1].arrow >= 2 && x.array[1].repeat > 1 &&
-          //10^^^ 10
-          isFinite(x.array[1].arrow)) {
-            // for any (10{A sample=2})^k 1e9, turn into (10{A})^k-1  (10{A-1})^1e9-1 10
-            // But dont convert when a is infinite
-            // [1e9, [R=K, A=2, sth, sth]]
-            x.array[1].repeat--;
-            x.array.splice(1, 0, newOperator(x.array[0].repeat - 1, x.array[1].arrow - 1, x.array[1].expans, x.array[1].megota));
-            x.array[0].repeat = 10;
-            renormalize = true;
-          }
-          // for any (10{A=2})^1e16 10, turn into (10{A+1}) 1e16
-          if (x.array.length >= 2 && x.array[1].repeat > MSI && x.array[1].arrow !== Infinity) {
-            x.array[1].arrow++;
-            x.array[0].repeat = x.array[1].repeat;
-            x.array[1].repeat = 1;
-            renormalize = true;
-          }
-          // for any (10{x})^1e16 10, turn into (10{1,2}) 1e16
-          if (x.array.length >= 2 && x.array[1].repeat > MSI && x.array[1].arrow === Infinity) {
-            x.array[1].arrow = 1;
-            x.array[1].expans++;
-            x.array[0].repeat = x.array[1].repeat;
-            x.array[1].repeat = 1;
-            renormalize = true;
-          }
-        } while (renormalize);
-        return this;
-      }
-      /**
-       * @returns  a PowiainaNum object which deep copied from `this` object.
-       */
-    }, {
-      key: "clone",
-      value: function clone() {
-        var obj = new PowiainaNum();
-        obj.resetFromObject(this);
-        return obj;
-      }
-      /**
-       * Set `this` from a object(deep-copy)
-       * @param powlikeObject
-       * @returns
-       */
-    }, {
-      key: "resetFromObject",
-      value: function resetFromObject(powlikeObject) {
-        if (!powlikeObject.array) {
-          return;
-        }
-        this.array = powlikeObject.array.map(function (item) {
-          return {
-            arrow: item.arrow,
-            expans: item.expans,
-            megota: item.megota,
-            repeat: item.repeat
-          };
-        });
-        this.small = powlikeObject.small;
-        this.sign = powlikeObject.sign;
-        this.layer = powlikeObject.layer;
-        return this;
-      }
-    }], [{
-      key: "add",
-      value: function add(t, other) {
-        return new PowiainaNum(t).add(other);
-      }
-    }, {
-      key: "plus",
-      value: function plus(t, other) {
-        return new PowiainaNum(t).add(other);
-      }
-    }, {
-      key: "sub",
-      value: function sub(t, other) {
-        return new PowiainaNum(t).sub(other);
-      }
-    }, {
-      key: "minus",
-      value: function minus(t, other) {
-        return new PowiainaNum(t).sub(other);
-      }
-    }, {
-      key: "mul",
-      value: function mul(t, other) {
-        return new PowiainaNum(t).mul(other);
-      }
-    }, {
-      key: "times",
-      value: function times(t, other) {
-        return new PowiainaNum(t).mul(other);
-      }
-    }, {
-      key: "div",
-      value: function div(t, other) {
-        return new PowiainaNum(t).div(other);
-      }
-    }, {
-      key: "divide",
-      value: function divide(t, other) {
-        return new PowiainaNum(t).div(other);
-      }
-    }, {
-      key: "mod",
-      value: function mod(x, y) {
-        return new PowiainaNum(x).mod(y);
-      }
-    }, {
-      key: "modulus",
-      value: function modulus(x, y) {
-        return new PowiainaNum(x).mod(y);
-      }
-    }, {
-      key: "pow",
-      value: function pow(t, other) {
-        return new PowiainaNum(t).pow(other);
-      }
-    }, {
-      key: "root",
-      value: function root(t, other) {
-        return new PowiainaNum(t).root(other);
-      }
-    }, {
-      key: "sqrt",
-      value: function sqrt(t) {
-        return new PowiainaNum(t).sqrt();
-      }
-    }, {
-      key: "cbrt",
-      value: function cbrt(t) {
-        return new PowiainaNum(t).cbrt();
-      }
-    }, {
-      key: "log10",
-      value: function log10(t) {
-        return new PowiainaNum(t).log10();
-      }
-    }, {
-      key: "log",
-      value: function log(t) {
-        var base = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : Math.E;
-        return new PowiainaNum(t).log(base);
-      }
-    }, {
-      key: "log2",
-      value: function log2(t) {
-        return new PowiainaNum(t).log2();
-      }
-    }, {
-      key: "logBase",
-      value: function logBase(t) {
-        var base = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : Math.E;
-        return new PowiainaNum(t).log(base);
-      }
-    }, {
-      key: "pLog10",
-      value: function pLog10(t) {
-        return new PowiainaNum(t).pLog10();
-      }
-    }, {
-      key: "exp",
-      value: function exp(x) {
-        var y = new PowiainaNum(x);
-        return y.pow_base(Math.E);
-      }
-    }, {
-      key: "factorial",
-      value: function factorial(x) {
-        return new PowiainaNum(x).factorial();
-      }
-    }, {
-      key: "gamma",
-      value: function gamma(x) {
-        return new PowiainaNum(x).gamma();
-      }
-    }, {
-      key: "lambertw",
-      value: function lambertw(x) {
-        var principal = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : true;
-        return new PowiainaNum(x).lambertw(principal);
-      }
-      //#endregion
-      //#region Commonly used functions by game
-      // All of these are from break_eternity.js
-      /**
-       * If you're willing to spend 'resourcesAvailable' and want to buy something
-       * with exponentially increasing cost each purchase (start at priceStart,
-       * multiply by priceRatio, already own currentOwned), how much of it can you buy?
-       * Adapted from Trimps source code.
-       *
-       * currentOwned >= priceStart*priceRatio^(return value)
-       */
-    }, {
-      key: "affordGeometricSeries",
-      value: function affordGeometricSeries(resourcesAvailable, priceStart, priceRatio, currentOwned) {
-        return this.affordGeometricSeries_core(new PowiainaNum(resourcesAvailable), new PowiainaNum(priceStart), new PowiainaNum(priceRatio), currentOwned);
-      }
-    }, {
-      key: "affordGeometricSeries_core",
-      value: function affordGeometricSeries_core(resourcesAvailable, priceStart, priceRatio, currentOwned) {
-        var withNaNProtect = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : true;
-        var actualStart = priceStart.mul(priceRatio.pow(currentOwned));
-        return resourcesAvailable.div(actualStart).mul(priceRatio.sub(1)).add(1).clampMin(withNaNProtect ? 1 : -Infinity).log10().div(priceRatio.log10()).floor();
-      }
-      /**
-       * How much resource would it cost to buy (numItems) items if you already have currentOwned,
-       * the initial price is priceStart and it multiplies by priceRatio each purchase?
-       *
-       * return value = priceStart*priceRatio^(numItems)
-       */
-    }, {
-      key: "sumGeometricSeries",
-      value: function sumGeometricSeries(numItems, priceStart, priceRatio, currentOwned) {
-        return this.sumGeometricSeries_core(numItems, new PowiainaNum(priceStart), new PowiainaNum(priceRatio), currentOwned);
-      }
-    }, {
-      key: "sumGeometricSeries_core",
-      value: function sumGeometricSeries_core(numItems, priceStart, priceRatio, currentOwned) {
-        return priceStart.mul(priceRatio.pow(currentOwned)).mul(PowiainaNum.sub(1, priceRatio.pow(numItems))).div(PowiainaNum.sub(1, priceRatio));
-      }
-      /**
-       * If you're willing to spend 'resourcesAvailable' and want to buy something with additively
-       * increasing cost each purchase (start at priceStart, add by priceAdd, already own currentOwned),
-       * how much of it can you buy?
-       */
-    }, {
-      key: "affordArithmeticSeries",
-      value: function affordArithmeticSeries(resourcesAvailable, priceStart, priceAdd, currentOwned) {
-        return this.affordArithmeticSeries_core(new PowiainaNum(resourcesAvailable), new PowiainaNum(priceStart), new PowiainaNum(priceAdd), new PowiainaNum(currentOwned));
-      }
-    }, {
-      key: "affordArithmeticSeries_core",
-      value: function affordArithmeticSeries_core(resourcesAvailable, priceStart, priceAdd, currentOwned) {
-        // n = (-(a-d/2) + sqrt((a-d/2)^2+2dS))/d
-        // where a is actualStart, d is priceAdd and S is resourcesAvailable
-        // then floor it and you're done!
-        var actualStart = priceStart.add(currentOwned.mul(priceAdd));
-        var b = actualStart.sub(priceAdd.div(2));
-        var b2 = b.pow(2);
-        return b.neg().add(b2.add(priceAdd.mul(resourcesAvailable).mul(2)).sqrt()).div(priceAdd).floor();
-      }
-      /**
-       * How much resource would it cost to buy (numItems) items if you already have currentOwned,
-       * the initial price is priceStart and it adds priceAdd each purchase?
-       * Adapted from http://www.mathwords.com/a/arithmetic_series.htm
-       */
-    }, {
-      key: "sumArithmeticSeries",
-      value: function sumArithmeticSeries(numItems, priceStart, priceAdd, currentOwned) {
-        return this.sumArithmeticSeries_core(new PowiainaNum(numItems), new PowiainaNum(priceStart), new PowiainaNum(priceAdd), new PowiainaNum(currentOwned));
-      }
-    }, {
-      key: "sumArithmeticSeries_core",
-      value: function sumArithmeticSeries_core(numItems, priceStart, priceAdd, currentOwned) {
-        var actualStart = priceStart.add(currentOwned.mul(priceAdd)); // (n/2)*(2*a+(n-1)*d)
-        return numItems.div(2).mul(actualStart.mul(2).add(numItems.sub(1).mul(priceAdd)));
-      }
-    }, {
-      key: "tetrate",
-      value: function tetrate(t, other2) {
-        var payload = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
-        return new PowiainaNum(t).tetrate(other2, payload);
-      }
-    }, {
-      key: "tetrate_10",
-      value: function tetrate_10(other2) {
-        return PowiainaNum.fromNumber(10).tetrate(other2);
-      }
-    }, {
-      key: "iteratedlog",
-      value: function iteratedlog(t) {
-        var other2 = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
-        var base2 = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 10;
-        return new PowiainaNum(t).iteratedlog(other2, base2);
-      }
-      //#endregion
-      /**
-       * Get the base of operators
-       */
-    }, {
-      key: "oBase",
-      value: function oBase(operators) {
-        return operators[0].repeat;
-      }
-    }, {
-      key: "operatorLevel",
-      value: function operatorLevel(operator) {
-        if (operator == undefined) return [0, 0, 0];
-        if (!Array.isArray(operator)) return [operator.megota, operator.expans, operator.arrow];else {
-          return _toConsumableArray(operator);
-        }
-      }
-    }, {
-      key: "cmpOperatorLevel",
-      value: function cmpOperatorLevel(operator, operator2) {
-        return compareTuples(this.operatorLevel(operator), this.operatorLevel(operator2));
-      }
-    }, {
-      key: "higherOmega",
-      value: function higherOmega(operator) {
-        this.operatorLevel(operator);
-        if (!isFinite(operator.expans)) return this.operatorLevel(operator);else if (!isFinite(operator.arrow)) return this.operatorLevel(operator);else {
-          return [operator.megota, operator.expans, 1 / 0];
-        }
-      }
-      /**
-       * Only works for operators level < ω2.
-       */
-    }, {
-      key: "omegacollect",
-      value: function omegacollect(operators) {
-        var _a;
-        // const result = {
-        //   bottom: NaN,
-        //   top: NaN,
-        // };
-        function upgrade2(base) {
-          operators[1].arrow++;
-          operators[0].repeat = operators[1].repeat + Math.log10(base);
-          operators[1].repeat = 1;
-        }
-        var maxWhile = 1000000;
-        while (maxWhile--) {
-          var base = PowiainaNum.oBase(operators);
-          if (base >= 10) {
-            // Bottom upgrade mode: add 10^'s.
-            operators[0].repeat = Math.log10(base);
-            PowiainaNum.opSetOperator(operators, PowiainaNum.opGetOperator(operators, 1, 1, 1) + 1, 1, 1, 1);
-          } else {
-            if (operators.length <= 2 && ((_a = operators[1]) === null || _a === void 0 ? void 0 : _a.repeat) == 1) {
-              return operators;
-            }
-            // Operator upgrade mode:
-            var nextisOmega = this.cmpOperatorLevel(this.higherOmega(operators[1]), operators[2]) <= 0;
-            // some operator will upgrade to 10{!}:
-            // first, the 3th operator is >=ω.
-            // second, the 2th operator's repeat is 1.
-            // third: the 2th operator's arrow >=3 and it's not 10{!}(for converting)
-            // fourth, base < 10
-            if (nextisOmega && operators[1].repeat == 1 && isFinite(operators[1].arrow) && operators[1].arrow >= 3) {
-              operators[0].repeat = operators[1].arrow - 1 + Math.log(operators[0].repeat / 2) / Math.log(5);
-              operators[1] = newOperator(1, 1 / 0, operators[1].expans, operators[1].megota);
-              mergeSameArrays({
-                array: operators
-              });
-              continue;
-            }
-            // Check the -2th operator, is repeat >= 2?
-            else if (isFinite(operators[1].arrow)) {
-              // 如果下一个是omega，而且operators[1].arrow<3的话，强行提到arrow>=3
-              if (operators[1].repeat >= 2) {
-                upgrade2(base);
-              } else if (nextisOmega && operators[1].arrow < 3) {
-                upgrade2(base);
-              } else if (base !== 1) {
-                upgrade2(base);
-              } else if (this.cmpOperatorLevel(this.higherOmega(operators[1]), operators[2]) == 1) {
-                // -2th repeat = 1, and base = 1, 3rd operator is not higher.
-                operators[1].arrow = operators[2].arrow;
-              }
-              mergeSameArrays({
-                array: operators
-              });
-              continue;
-            } else if (!isFinite(operators[1].arrow)) {
-              // if an operator is 10{!}, upgrade to a higher level
-              // 10{!}3 = 10{1,2}(1+Math.log10(3))
-              var infRepeat = operators[1].repeat;
-              var baseAfter = infRepeat + Math.log10(base);
-              operators[1] = newOperator(1, 1, operators[1].expans + 1, operators[1].megota);
-              operators[0].repeat = baseAfter;
-              mergeSameArrays({
-                array: operators
-              });
-              continue;
-            }
-          }
-        }
-        return operators;
-      }
-    }, {
-      key: "arrow",
-      value: function arrow(x, z, y) {
-        return new PowiainaNum(x).arrow(z)(y);
-      }
-    }, {
-      key: "arrFrac",
-      value: function arrFrac(base, height) {
-        if (new PowiainaNum(height).lt(2)) return PowiainaNum.pentate(base, height);
-        var b = new PowiainaNum(base);
-        var h = new PowiainaNum(height);
-        return new PowiainaNum(b).arrow(h.floor().add(1))(b.div(2).pow(h.sub(h.floor())).mul(2));
-      }
-      /**
-       * base{{height}}base
-       */
-    }, {
-      key: "arrw2Frac",
-      value: function arrw2Frac(base, height) {
-        if (new PowiainaNum(height).lt(2)) return new PowiainaNum(base).expansionArrow(3)(height);
-        var b = new PowiainaNum(base);
-        var h = new PowiainaNum(height);
-        return new PowiainaNum(b).expansionArrow(h.floor().add(1))(b.div(2).pow(h.sub(h.floor())).mul(2));
-      }
-    }, {
-      key: "arrowMSI",
-      value: function arrowMSI(arrowsNum) {
-        return new PowiainaNum("10{".concat(arrowsNum, "}").concat(MSI));
-      }
-    }, {
-      key: "arrowexpansMSI",
-      value: function arrowexpansMSI(arrowsNum) {
-        return new PowiainaNum("10{".concat(arrowsNum, ",2}").concat(MSI));
-      }
-    }, {
-      key: "hyper",
-      value: function hyper(arr) {
-        var z = new PowiainaNum(arr);
-        if (z.eq(0)) return function (x, y) {
-          return new PowiainaNum(y).eq(0) ? new PowiainaNum(x) : new PowiainaNum(x).add(1);
-        };
-        if (z.eq(1)) return PowiainaNum.add;else if (z.eq(2)) return PowiainaNum.mul;else if (z.eq(3)) return PowiainaNum.pow;else {
-          return function (x, y) {
-            return new PowiainaNum(x).arrow(z.sub(2))(y);
-          };
-        }
-      }
-    }, {
-      key: "pentate",
-      value: function pentate(x, other, payload) {
-        return new PowiainaNum(x).arrow(3)(other, payload);
-      }
-    }, {
-      key: "hexate",
-      value: function hexate(x, other, payload) {
-        return new PowiainaNum(x).arrow(4)(other, payload);
-      }
-    }, {
-      key: "pent",
-      value: function pent(x, other, payload) {
-        return new PowiainaNum(x).arrow(3)(other, payload);
-      }
-    }, {
-      key: "penta_log",
-      value: function penta_log(x) {
-        var base = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 10;
-        return new PowiainaNum(x).anyarrow_log(3)(base);
-      }
-    }, {
-      key: "expansion",
-      value: function expansion(t, other) {
-        return new PowiainaNum(t).expansion(other);
-      }
-    }, {
-      key: "multiExpansion",
-      value: function multiExpansion(t, other) {
-        return new PowiainaNum(t).multiExpansion(other);
-      }
-    }, {
-      key: "powerExpansion",
-      value: function powerExpansion(t, other) {
-        return new PowiainaNum(t).powerExpansion(other);
-      }
-    }, {
-      key: "BEAF",
-      value: function BEAF() {
-        for (var _len8 = arguments.length, args = new Array(_len8), _key8 = 0; _key8 < _len8; _key8++) {
-          args[_key8] = arguments[_key8];
-        }
-        function getArgs(x) {
-          if (args[x] !== undefined && args[x] !== null) return new PowiainaNum(args[x]);
-          return new PowiainaNum(1);
-        }
-        if (getArgs(0).eq(1)) return new PowiainaNum(1);
-        if (getArgs(1).eq(1)) return new PowiainaNum(getArgs(0));
-        if (getArgs(5).eq(2) && (getArgs(4).gte(2) || getArgs(3).gte(2) || getArgs(2).gte(2))) return PowiainaNum.POSITIVE_INFINITY;
-        if (args.slice(6).map(function (x) {
-          return new PowiainaNum(x);
-        }).filter(function (x) {
-          return x.gt(1);
-        }).length !== 0) return PowiainaNum.POSITIVE_INFINITY;
-        return PowiainaNum.BEAF_core(getArgs(0), getArgs(1), getArgs(2), getArgs(3), getArgs(4), getArgs(5));
-      }
-    }, {
-      key: "BEAF_core",
-      value: function BEAF_core(base2, power2) {
-        var arrow2 = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
-        var expans2 = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 1;
-        var megota2 = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : 1;
-        var powiaina2 = arguments.length > 5 && arguments[5] !== undefined ? arguments[5] : 1;
-        var depth = arguments.length > 6 && arguments[6] !== undefined ? arguments[6] : 0;
-        // console.warn(
-        //   "This function is unstable when calculating numbers greater than *megotion*",
-        // );
-        var base = new PowiainaNum(base2);
-        var power = new PowiainaNum(power2);
-        function readArg(a) {
-          var _a;
-          return new PowiainaNum((_a = [arrow2, expans2, megota2, powiaina2][a]) !== null && _a !== void 0 ? _a : 1);
-        }
-        if (base.eq(1)) return new PowiainaNum(1);
-        if (power.eq(1)) return new PowiainaNum(base);
-        if (power.isZero()) return new PowiainaNum(1);
-        if (base.lt(0)) {
-          if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-          return PowiainaNum.NaN;
-        }
-        // // check infinite
-        // let sufpowiaina = args.slice(4);
-        // if (sufpowiaina.filter((f) => new PowiainaNum(f).gte(2)).length > 0) {
-        //   return PowiainaNum.POSITIVE_INFINITY;
-        // }
-        if (new PowiainaNum(powiaina2).gte(3)) return PowiainaNum.POSITIVE_INFINITY;
-        if (readArg(0).eq(0) && readArg(1).eq(1) && readArg(2).eq(1)) {
-          return base.mul(power);
-        }
-        if (readArg(0).eq(1) && readArg(1).eq(1) && readArg(2).eq(1)) {
-          return base.pow(power);
-        }
-        if (readArg(0).eq(2) && readArg(1).eq(1) && readArg(2).eq(1) && readArg(3).eq(1)) {
-          return base.tetrate(power);
-        }
-        if (readArg(1).eq(1) && readArg(2).eq(1) && readArg(3).eq(1)) {
-          return base.arrow(readArg(0))(power);
-        }
-        if (readArg(1).eq(2) && readArg(2).eq(1) && readArg(3).eq(1)) {
-          return base.expansionArrow(readArg(0))(power);
-        }
-        var arrow = readArg(0).toNumber();
-        var expans = readArg(1);
-        var megota = readArg(2);
-        var powiaina = readArg(3);
-        if (powiaina.eq(2)) {
-          if (arrow != 1) return PowiainaNum.POSITIVE_INFINITY;
-          if (expans.neq(1)) return PowiainaNum.POSITIVE_INFINITY;
-          if (megota.neq(1)) return PowiainaNum.POSITIVE_INFINITY;
-          if (power.gte(MSI)) return PowiainaNum.POSITIVE_INFINITY;
-          var r = new PowiainaNum(10);
-          r.layer = power.toNumber();
-          r.normalize();
-          return r;
-        }
-        function convertOperator(arrows, expans, megota) {
-          var a = arrows;
-          var e = expans;
-          var m = megota;
-          if (a == 0 && e > 1) {
-            return [1 / 0, e - 1, m];
-          }
-          if (a == 0 && e == 1 && m > 1) {
-            return [1, 1 / 0, m - 1];
-          }
-          return [a, e, m];
-        }
-        if (megota.gt(MSI)) {
-          var temp = new PowiainaNum(megota);
-          temp.layer++;
-          temp.normalize();
-          return temp;
-        }
-        function infToBang(x) {
-          if (!isFinite(x)) return "!";
-          return x.toString();
-        }
-        function getMSIForm(arrow, expans, megota) {
-          var _convertOperator = convertOperator(arrow, expans, megota),
-            _convertOperator2 = _slicedToArray(_convertOperator, 3),
-            a = _convertOperator2[0],
-            e = _convertOperator2[1],
-            m = _convertOperator2[2];
-          return "10{".concat(infToBang(a), ",").concat(infToBang(e), ",").concat(m, "}").concat(MSI);
-        }
-        var t = base;
-        var arrows = new PowiainaNum(readArg(0));
-        var result = function (other2) {
-          var depth = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
-          var ctt = PowiainaNum.beafFuncMap.get("".concat(t.toString(), " ").concat(arrow.toString(), " ").concat(expans.toString(), " ").concat(megota.toString(), " ").concat(powiaina.toString(), " ").concat(other2.toString(), " ").concat(depth));
-          if (ctt) return ctt;
-          // console.log(
-          //   `${"-".repeat(depth)} {${base2},${power2},${arrow2},${expans2},${megota2}}`
-          // );
-          var other = new PowiainaNum(other2);
-          var r;
-          if (t.isNaN() || other.isNaN()) return PowiainaNum.NaN;
-          if (other.lt(PowiainaNum.ZERO)) return PowiainaNum.NaN;
-          if (t.eq(PowiainaNum.ZERO)) {
-            if (other.eq(PowiainaNum.ONE)) return PowiainaNum.ZERO;
-            if (PowiainaNum.throwErrorOnResultNaN) throw new Error("NaN");
-            return PowiainaNum.NaN;
-          }
-          if (t.eq(PowiainaNum.ONE)) return PowiainaNum.ONE;
-          if (other.eq(PowiainaNum.ZERO)) return PowiainaNum.ONE;
-          if (other.eq(PowiainaNum.ONE)) return t;
-          if (arrows.eq(0)) {
-            return PowiainaNum.BEAF_core(t, t, power, expans.sub(1), megota, powiaina2, depth + 1);
-            // {this, this, power, expans-1, megota}
-          }
-          if (expans.eq(0)) {
-            return PowiainaNum.BEAF_core(t, t, t, power, megota.sub(1), powiaina2, depth + 1);
-            // {this, this, this, power, megota-1}
-          }
-          if (megota.eq(0)) {
-            return PowiainaNum.BEAF_core(t, t, t, t, expans, new PowiainaNum(powiaina2).sub(1), depth + 1);
-          }
-          // megota < 9e15, not implemented
-          if (megota.gt(MSI)) {
-            throw new Error("Not implemeneted");
-          }
-          // expans > 9e15, that using 10{?, x}, x=expans;
-          if (expans.gt(MSI)) {
-            r = new PowiainaNum(expans);
-            r.setOperator(r.getOperator(1, Infinity, megota.toNumber()) + 1, 1, Infinity, megota.toNumber());
-            return r;
-          }
-          // arrow > 9e15, that using 10{x,2}, x=arrow;
-          if (arrows.gt(PowiainaNum.MSI)) {
-            r = arrows.clone();
-            r.setOperator(r.getOperator(Infinity, expans.toNumber(), megota.toNumber()) + 1, Infinity, expans.toNumber(), megota.toNumber());
-            return r;
-          }
-          var arrowsNum = arrows.toNumber();
-          // arrow < 9e15
-          // 10{x}2 = 10{x-1}10
-          if (other.eq(2)) return PowiainaNum.BEAF_core(t, t, arrowsNum - 1, expans, megota, powiaina2, depth + 1);
-          if (t.max(other).gt(getMSIForm(arrowsNum + 1, expans.toNumber(), megota.toNumber()))) return t.max(other);
-          // arrow < 9e15
-          // 10{x}2 = 10{x-1}10
-          if (t.gt(getMSIForm(arrowsNum + 1, expans.toNumber(), megota.toNumber())) || other.gt(MSI)) {
-            if (t.gt(getMSIForm(arrowsNum, expans.toNumber(), megota.toNumber()))) {
-              r = t.clone();
-              r.setOperator(r.getOperator(arrowsNum, expans.toNumber(), megota.toNumber()) - 1, arrowsNum, expans.toNumber(), megota.toNumber());
-              r.normalize();
-            } else if (t.gt(getMSIForm(arrowsNum - 1, expans.toNumber(), megota.toNumber()))) {
-              r = new PowiainaNum(t.getOperator(arrowsNum - 1, expans.toNumber(), megota.toNumber()));
-            } else {
-              r = PowiainaNum.ZERO;
-            }
-            var j = r.add(other);
-            j.setOperator(j.getOperator(arrowsNum, expans.toNumber(), megota.toNumber()) + 1, arrowsNum, expans.toNumber(), megota.toNumber());
-            j.normalize();
-            return j;
-          }
-          if (depth >= PowiainaNum.maxOps + 10) {
-            return new PowiainaNum({
-              small: false,
-              sign: 1,
-              layer: 0,
-              array: [newOperator(10, 0), newOperator(1, arrowsNum, expans.toNumber(), megota.toNumber())]
-            });
-          }
-          var y = other.toNumber();
-          var f = Math.floor(y);
-          var arrows_m1 = arrows.sub(PowiainaNum.ONE);
-          r = PowiainaNum.BEAF_core(t, y - f, arrows_m1, expans, megota, powiaina, depth + 1);
-          // r = t.arrow(arrows_m1)(y - f, payload, depth + 1);
-          var i = 0;
-          for (var m = getMSIForm(arrowsNum - 1, expans.toNumber(), megota.toNumber()); f !== 0 && r.lt(m) && i < 100; i++) {
-            if (f > 0) {
-              r = PowiainaNum.BEAF_core(t, r, arrows_m1, expans, megota, powiaina, depth + 1);
-              --f;
-            }
-          }
-          if (i == 100) f = 0;
-          r.setOperator(r.getOperator(arrowsNum - 1, expans.toNumber(), megota.toNumber()) + f, arrowsNum - 1, expans.toNumber(), megota.toNumber());
-          r.normalize();
-          return r;
-        }(power, depth);
-        if (depth < PowiainaNum.maxOps + 10) {
-          PowiainaNum.beafFuncMap.set("".concat(t.toString(), " ").concat(arrow.toString(), " ").concat(expans.toString(), " ").concat(megota.toString(), " ").concat(powiaina.toString(), " ").concat(power.toString(), " ").concat(depth), result);
-        }
-        return result;
-      }
-    }, {
-      key: "abs",
-      value: function abs(x) {
-        return new PowiainaNum(x).abs();
-      }
-      /**
-       * Select the largest number of arguments.
-       */
-    }, {
-      key: "max",
-      value: function max() {
-        var max = PowiainaNum.NEGATIVE_INFINITY;
-        for (var _len9 = arguments.length, args = new Array(_len9), _key9 = 0; _key9 < _len9; _key9++) {
-          args[_key9] = arguments[_key9];
-        }
-        for (var i = 0; i < args.length; i++) {
-          if (max.lt(args[i])) {
-            max = new PowiainaNum(args[i]);
-          }
-        }
-        return max;
-      }
-      /**
-       * Select the smallest number of arguments.
-       */
-    }, {
-      key: "min",
-      value: function min() {
-        var max = PowiainaNum.POSITIVE_INFINITY;
-        for (var _len0 = arguments.length, args = new Array(_len0), _key0 = 0; _key0 < _len0; _key0++) {
-          args[_key0] = arguments[_key0];
-        }
-        for (var i = 0; i < args.length; i++) {
-          if (max.gt(args[i])) {
-            max = new PowiainaNum(args[i]);
-          }
-        }
-        return max;
-      }
-      /**
-       * Restrict a number be not lower than a number
-       *
-       * It's also an alias of `PowiainaNum.max`.
-       * @returns restricted number
-       */
-    }, {
-      key: "clampMin",
-      value: function clampMin() {
-        return PowiainaNum.max.apply(PowiainaNum, arguments);
-      }
-    }, {
-      key: "clampMax",
-      value: function clampMax() {
-        return PowiainaNum.min.apply(PowiainaNum, arguments);
-      }
-    }, {
-      key: "eq",
-      value: function eq(a, o) {
-        return new PowiainaNum(a).eq(o);
-      }
-    }, {
-      key: "equals",
-      value: function equals(a, o) {
-        return new PowiainaNum(a).eq(o);
-      }
-    }, {
-      key: "neq",
-      value: function neq(a, o) {
-        return new PowiainaNum(a).neq(o);
-      }
-    }, {
-      key: "notEquals",
-      value: function notEquals(a, o) {
-        return new PowiainaNum(a).notEquals(o);
-      }
-    }, {
-      key: "lt",
-      value: function lt(a, o) {
-        return new PowiainaNum(a).lt(o);
-      }
-    }, {
-      key: "gt",
-      value: function gt(a, o) {
-        return new PowiainaNum(a).gt(o);
-      }
-    }, {
-      key: "lte",
-      value: function lte(a, o) {
-        return new PowiainaNum(a).lte(o);
-      }
-    }, {
-      key: "gte",
-      value: function gte(a, o) {
-        return new PowiainaNum(a).gte(o);
-      }
-    }, {
-      key: "rec",
-      value: function rec(t) {
-        return new PowiainaNum(t).rec();
-      }
-    }, {
-      key: "recip",
-      value: function recip(t) {
-        return new PowiainaNum(t).rec();
-      }
-    }, {
-      key: "reciprocate",
-      value: function reciprocate(t) {
-        return new PowiainaNum(t).rec();
-      }
-    }, {
-      key: "floor",
-      value: function floor(x) {
-        return new PowiainaNum(x).floor();
-      }
-    }, {
-      key: "ceil",
-      value: function ceil(x) {
-        return new PowiainaNum(x).ceil();
-      }
-    }, {
-      key: "round",
-      value: function round(x) {
-        return new PowiainaNum(x).round();
-      }
-    }, {
-      key: "trunc",
-      value: function trunc(x) {
-        return new PowiainaNum(x).trunc();
-      }
-      /**
-       * @returns if this<other, return -1, if this=other, return 0, if this>other, return 1, if this!<=>, return 2
-       */
-    }, {
-      key: "sign",
-      value: function sign(a) {
-        return new PowiainaNum(a).sign;
-      }
-    }, {
-      key: "isNaN",
-      value: function isNaN(x) {
-        return new PowiainaNum(x).isNaN();
-      }
-      //#endregion
-      //#region operators
-      /**
-       * @returns number will return the index of the operator. return as x.5 if it's between the xth and x+1th operators.
-       */
-    }, {
-      key: "opGetOperatorIndex",
-      value: function opGetOperatorIndex(operators, arrow) {
-        var expans = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
-        var megota = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 1;
-        for (var i = 0; i < operators.length; i++) {
-          var cmp = compareTuples([operators[i].megota, operators[i].expans, operators[i].arrow], [megota, expans, arrow]);
-          if (cmp == 0) return i; // I find it was [xx,xxx,*xxx*,xxx]!
-          if (cmp == 1) return i - 0.5; // It's between [xx, xx,xx*,?,*xx]!
-        }
-        return operators.length - 0.5;
-      }
-    }, {
-      key: "opGetOperator",
-      value: function opGetOperator(operators, arrow) {
-        var expans = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
-        var megota = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 1;
-        var index = PowiainaNum.opGetOperatorIndex(operators, arrow, expans, megota);
-        if (!operators[index]) return 0;
-        return operators[index].repeat;
-      }
-    }, {
-      key: "opSetOperator",
-      value: function opSetOperator(operators, val, arrow) {
-        var expans = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 1;
-        var megota = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : 1;
-        // if (arrow!=0&&val==0) return false;
-        var index = PowiainaNum.opGetOperatorIndex(operators, arrow, expans, megota);
-        if (!operators[index]) {
-          operators.splice(Math.ceil(index), 0, {
-            arrow: arrow,
-            expans: expans,
-            megota: megota,
-            valuereplaced: expans === Infinity ? 1 : arrow == Infinity ? 0 : -1,
-            repeat: val
-          });
-          return true;
-        }
-        operators[index].repeat = val;
-        if (operators[index].repeat == 0) {
-          operators.splice(index, 1);
-          return true;
-        }
-        // this.normalize()
-        return false;
-      }
-    }, {
-      key: "fromBigInt",
-      value: function fromBigInt(input) {
-        var x = new PowiainaNum(0);
-        var abs = input < BigInt(0) ? -input : input;
-        x.sign = input < BigInt(0) ? -1 : 1;
-        if (abs <= MSI) x.array = [newOperator(Number(abs))];else x.array = [newOperator(log10PosBigInt(abs)), newOperator(1, 1)];
-        x.normalize();
-        return x;
-      }
-    }, {
-      key: "fromNumber",
-      value: function fromNumber(x) {
-        var obj = new PowiainaNum();
-        obj.resetFromObject({
-          array: [{
-            arrow: 0,
-            expans: 1,
-            megota: 1,
-            repeat: NaN
-          }],
-          small: false,
-          layer: 0,
-          sign: 0
-        });
-        if (Number.isNaN(x)) return obj;
-        if (x < 0) obj.sign = -1; // negative
-        else if (x == 0) {
-          obj.sign = 0;
-          obj.small = true;
-          obj.array = [newOperator(Infinity, 0)];
-          return obj;
-        } else if (x > 0) obj.sign = 1;
-        var y = Math.abs(x);
-        if (y == Infinity) {
-          obj.array = [newOperator(Infinity, 0)];
-        } else if (y >= MSI_REC && y < 1) {
-          obj.small = true;
-          obj.array = [newOperator(1 / y, 0)];
-        } else if (y < MSI_REC) {
-          obj.small = true;
-          obj.array = [newOperator(-Math.log10(y), 0), newOperator(1, 1)];
-        } else if (y <= MSI) {
-          obj.array = [newOperator(y, 0)];
-        } else {
-          obj.setOperator(Math.log10(y), 0);
-          obj.array = [newOperator(Math.log10(y), 0), newOperator(1, 1)];
-        }
-        return obj;
-      }
-    }, {
-      key: "fromString",
-      value: function fromString(input) {
-        if (PowiainaNum.usingBreakEternityLikeFromString && BE_REGEX.test(input)) {
-          /*
-           * 0i00000000a7 says that eee-3000 will wrongly parse to 1. So i added this
-           */
-          var a = input.match(/(e+-)(\d+(.\d+)?)/);
-          if (a) {
-            var e_s = a[1].length;
-            input = "/" + "e".repeat(e_s - 1) + a[2];
-          }
-        }
-        return this.fromString_core(input);
-      }
-    }, {
-      key: "fromString_core",
-      value: function fromString_core(input) {
-        var _a, _b, _c, _d, _e, _f;
-        var x = new PowiainaNum(NaN);
-        // Judge the string was a number
-        if (input.startsWith("PN")) input = input.substring(2);
-        if (input == "NaN") return PowiainaNum.NaN;
-        if (!PowiainaNum.vanilla) {
-          input = input.replace(/J\^(\d+)/g, "(10{!})^$1");
-          input = input.replace(/J/g, "10{!}");
-          input = input.replace(/K\^(\d+)/g, "(10{1,2})^$1");
-          input = input.replace(/K/g, "10{1,2}");
-          input = input.replace(/L\^(\d+)/g, "(10{2,2})^$1");
-          input = input.replace(/L/g, "10{2,2}");
-          input = input.replace(/M\^(\d+)/g, "(10{!,2})^$1");
-          input = input.replace(/M/g, "10{!,2}");
-          input = input.replace(/N\^(\d+)/g, "(10{1,!})^$1");
-          input = input.replace(/N/g, "10{1,!}");
-          if (/^.*e-.*(e|\^).*/.test(input)) {
-            input = "/10^" + input.substring(input.indexOf("e-"));
-          }
-        }
-        if (!isNaN(Number(input))) {
-          var res = Number(input);
-          var a = false;
-          if (res == 0) {
-            if (/^((0)|(0*\.0+e\d+)|(0*\.0*))$/.test(input)) {
-              a = true;
-            }
-          } else {
-            a = true;
-          }
-          if (!a) {
-            var m = input.search(/e/);
-            var exponent = input.substring((m == -1 ? input.length : m) + 1);
-            var mantissa = input.substring(0, m == -1 ? undefined : m);
-            var mantissaME = [0, 0];
-            // Handle mantissa to ME
-            mantissaME[1] = Number(exponent ? exponent : "0");
-            // Is regular number gte 1:
-            if (Number(mantissa) >= 1) {
-              // check The mantissa is very long?
-              var log10mant = mantissa.length >= LONG_STRING_MIN_LENGTH ? log10LongString(mantissa) : Math.log10(Number(mantissa)); // sample 10
-              var log10int = Math.floor(log10mant); // sample 1
-              var log10float = log10mant - log10int; // sample 0;
-              mantissaME[0] = Math.pow(10, log10float);
-              mantissaME[1] += log10int;
-            } else {
-              // If not , count how many zeros until reached non-zero numbers
-              var zeros = countLeadingZerosAfterDecimal(mantissa);
-              mantissa = mantissa.substring(mantissa.search(/[1-9]/));
-              mantissa = mantissa.charAt(0) + "." + mantissa.substring(1);
-              zeros += 1;
-              mantissaME[0] = Number(mantissa);
-              mantissaME[1] += -zeros;
-            }
-            // We'll get [a, b] which respents a*10^b;
-            // actually b < 0; So we can ^-1
-            // /((a*10^b)^-1) = /(a^-1*10^-b) = /(a^-1 * 10 * 10^(-b-1))
-            return PowiainaNum.pow(10, -mantissaME[1] - 1).mul(Math.pow(mantissaME[0], -1) * 10).rec();
-          }
-          if (isFinite(res) && a) {
-            x = PowiainaNum.fromNumber(Number(input));
-            return x;
-          }
-        }
-        // Check legacy PowiainaNum 0.1.x number format
-        if (input.indexOf("l") !== -1 && input.indexOf("s") !== -1 && input.indexOf("a") !== -1) {
-          var obj = parseLegacyPowiainaNumString(input);
-          if (!obj || obj.sValue !== 0 && obj.sValue !== 1 && obj.sValue !== -1) throw powiainaNumError + "malformed input: " + input;
-          x = PowiainaNum.fromObject(obj.array);
-          x.layer = obj.lValue;
-          x.sign = obj.sValue;
-          x.small = false;
-          x.normalize();
-          return x;
-        }
-        if (!PowiainaNum.vanilla) input = replaceETo10(input);
-        if (!PowiainaNum.vanilla) input = removeCommasOutsideBraces(input);
-        if (!isPowiainaNum.test(input)) {
-          throw powiainaNumError + "malformed input: " + input;
-        }
-        var negateIt = false;
-        var recipIt = false;
-        if (input[0] == "-" || input[0] == "+") {
-          var numSigns = input.search(/[^-\+]/);
-          var signs = input.substring(0, numSigns);
-          negateIt = ((_b = (_a = signs.match(/-/g)) === null || _a === void 0 ? void 0 : _a.length) !== null && _b !== void 0 ? _b : 0) % 2 == 1;
-          input = input.substring(numSigns);
-        }
-        if (input[0] == "/") {
-          var _numSigns = input.search(/[^\/]/);
-          var _signs = input.substring(0, _numSigns);
-          recipIt = ((_d = (_c = _signs.match(/\//g)) === null || _c === void 0 ? void 0 : _c.length) !== null && _d !== void 0 ? _d : 0) % 2 == 1;
-          input = input.substring(_numSigns);
-        }
-        if (input == "NaN") x.array = [newOperator(NaN)];else if (input == "Infinity") {
-          x.sign = 1;
-          x.array = [newOperator(Infinity)];
-        } else {
-          x.sign = 1;
-          x.array = [newOperator(0)];
-          var _a3, b, c, d;
-          if (input[0] == "P") {
-            if (input[1] == "^") {
-              _a3 = input.substring(2).search(/[^0-9]/) + 2;
-              x.layer = Number(input.substring(2, _a3));
-              input = input.substring(_a3 + 1);
-            } else {
-              _a3 = input.search(/[^P]/);
-              x.layer = _a3;
-              input = input.substring(_a3);
-            }
-          }
-          while (input) {
-            if (/^(\(?10[\^\{])/.test(input)) {
-              var arrows = void 0,
-                expans = void 0,
-                megota = void 0;
-              /*
-                10^ - 匹配
-                10{ - 匹配
-                (10^ - 匹配
-                (10{ - 匹配
-                10x - 不匹配（最后一个字符不是 ^ 或 {）
-                110^ - 不匹配（不是以 10 开头）
-              */
-              if (input[0] == "(") input = input.substring(1);
-              //cutted, 10^.... or 10{....
-              if (input[2] == "^") {
-                _a3 = input.substring(2).search(/[^\^]/);
-                //cut input to ^^...^^, and search how numbers
-                arrows = _a3;
-                // 10^^^
-                b = _a3 + 2; // b points to after ^'s.
-              } else {
-                // 10{...}
-                _a3 = input.indexOf("}");
-                // select contents between {...}
-                var tmp = input.substring(3, _a3).split(",");
-                arrows = Number(tmp[0] == "!" ? Infinity : tmp[0]);
-                expans = Number((_e = tmp[1] == "!" ? Infinity : tmp[1]) !== null && _e !== void 0 ? _e : 1);
-                megota = Number((_f = tmp[2]) !== null && _f !== void 0 ? _f : 1);
-                b = _a3 + 1;
-                // b points to after }.
-              }
-              input = input.substring(b);
-              if (input[0] == ")") {
-                // )^....<Space>
-                _a3 = input.indexOf(" ");
-                c = Number(input.substring(2, _a3)); // Select contents between )^....<Space>
-                input = input.substring(_a3 + 1); // c points to after <Space>
-              } else {
-                c = 1; // There is only spaces, count as <ONE>
-              }
-              if (arrows == 1 && expans == 1 && megota == 1) {
-                if (x.array.length >= 2 && x.array[1].arrow == 1 && x.array[1].expans == 1 && x.array[1].megota == 1) {
-                  x.array[1].repeat += c;
-                } else {
-                  x.array.splice(1, 0, newOperator(c, 1, expans, megota));
-                }
-              } else if (arrows == 2 && expans == 1 && megota == 1) {
-                _a3 = x.array.length >= 2 && x.array[1].arrow == 1 && x.array[1].expans == 1 && x.array[1].megota == 1 ? x.array[1].repeat : 0;
-                b = x.array[0].repeat;
-                if (b >= 1e10) ++_a3;
-                if (b >= 10) ++_a3;
-                x.array[0].repeat = _a3;
-                if (x.array.length >= 2 && x.array[1].arrow == 1 && x.array[1].expans == 1 && x.array[1].megota == 1) x.array.splice(1, 1);
-                d = x.getOperatorIndex(2);
-                if (Number.isInteger(d)) x.array[d].repeat += c;else x.array.splice(Math.ceil(d), 0, newOperator(c, 2, expans, megota));
-              } else if (isFinite(arrows) && expans == 1 && megota == 1) {
-                _a3 = x.getOperator(arrows - 1);
-                b = x.getOperator(arrows - 2);
-                if (b >= 10) ++_a3;
-                d = x.getOperatorIndex(arrows);
-                x.array.splice(1, Math.ceil(d) - 1);
-                x.array[0].repeat = _a3;
-                if (Number.isInteger(d)) x.array[1].repeat += c;else x.array.splice(1, 0, newOperator(c, arrows, expans, megota));
-              } else {
-                x.array.splice(1, 0, newOperator(c, arrows, expans, megota));
-              }
-            } else {
-              break;
-            }
-          }
-          _a3 = input.split(/[Ee]/);
-          b = [x.array[0].repeat, 0];
-          c = 1;
-          for (var i = _a3.length - 1; i >= 0; --i) {
-            //The things that are already there
-            if (b[0] < MSI_LOG10 && b[1] === 0) {
-              b[0] = Math.pow(10, c * b[0]);
-            } else if (c == -1) {
-              if (b[1] === 0) {
-                b[0] = Math.pow(10, c * b[0]);
-              } else if (b[1] == 1 && b[0] <= Math.log10(Number.MAX_VALUE)) {
-                b[0] = Math.pow(10, c * Math.pow(10, b[0]));
-              } else {
-                b[0] = 0;
-              }
-              b[1] = 0;
-            } else {
-              b[1]++;
-            }
-            //Multiplying coefficient
-            var decimalPointPos = _a3[i].indexOf(".");
-            var intPartLen = decimalPointPos == -1 ? _a3[i].length : decimalPointPos;
-            if (b[1] === 0) {
-              if (intPartLen >= LONG_STRING_MIN_LENGTH) b[0] = Math.log10(b[0]) + log10LongString(_a3[i].substring(0, intPartLen)), b[1] = 1;else if (_a3[i]) b[0] *= Number(_a3[i]);
-            } else {
-              d = intPartLen >= LONG_STRING_MIN_LENGTH ? log10LongString(_a3[i].substring(0, intPartLen)) : _a3[i] ? Math.log10(Number(_a3[i])) : 0;
-              if (b[1] == 1) {
-                b[0] += d;
-              } else if (b[1] == 2 && b[0] < MSI_LOG10 + Math.log10(d)) {
-                b[0] += Math.log10(1 + Math.pow(10, Math.log10(d) - b[0]));
-              }
-            }
-            //Carrying
-            if (b[0] < MSI_LOG10 && b[1]) {
-              b[0] = Math.pow(10, b[0]);
-              b[1]--;
-            } else if (b[0] > MSI) {
-              b[0] = Math.log10(b[0]);
-              b[1]++;
-            }
-          }
-          x.array[0].repeat = b[0];
-          if (b[1]) {
-            if (x.array.length >= 2 && x.array[1].arrow == 1 && x.array[1].expans == 1 && x.array[1].megota == 1) x.array[1].repeat += b[1];else x.array.splice(1, 0, newOperator(b[1], 1, 1, 1));
-          }
-        }
-        if (negateIt) x.sign *= -1;
-        if (recipIt) x.small = !x.small;
-        x.normalize();
-        x.normalize();
-        return x;
-      }
-    }, {
-      key: "fromObject",
-      value: function fromObject(powlikeObject) {
-        var obj = new PowiainaNum();
-        obj.resetFromObject({
-          array: [{
-            arrow: 0,
-            expans: 1,
-            megota: 1,
-            repeat: NaN
-          }],
-          small: false,
-          layer: 0,
-          sign: 0
-        });
-        obj.array = [];
-        if (isExpantaNumArray(powlikeObject)) {
-          for (var i = 0; i < powlikeObject.length; i++) {
-            obj.array[i] = {
-              arrow: powlikeObject[i][0],
-              expans: 1,
-              megota: 1,
-              repeat: powlikeObject[i][1]
-            };
-          }
-          obj.small = false;
-          obj.sign = 1;
-          obj.layer = 0;
-          return obj;
-        } else if (isIBreakEternity(powlikeObject)) {
-          var res = powlikeObject;
-          var reciprocated = res.mag < 0;
-          var res2 = new PowiainaNum(1);
-          if (res.layer >= MSI) res2.array = [newOperator(Math.log10(res.layer)), newOperator(1, 1), newOperator(1, 2)];else if (res.layer >= 1) res2.array = [newOperator(Math.abs(res.mag)), newOperator(res.layer, 1)];else res2.array = [newOperator(res.mag)];
-          res2.small = reciprocated;
-          res2.normalize();
-          return res2;
-        } else if (isPowiainaNum01XArray(powlikeObject)) {
-          var arrayobj = powlikeObject;
-          obj.array[0] = newOperator(arrayobj[0]);
-          for (var _i4 = 1; _i4 < arrayobj.length; _i4++) {
-            var b = arrayobj[_i4];
-            obj.array[1] = newOperator(b[1], replaceXToInfinity(b[0]), replaceXToInfinity(b[2]), b[3]);
-          }
-          obj.small = false;
-          obj.sign = 1;
-          obj.layer = 0;
-          return obj;
-        } else {
-          obj.resetFromObject(powlikeObject);
-          return obj;
-        }
-      }
-    }, {
-      key: "grahalFunction",
-      value: function grahalFunction(layers2) {
-        var layers = new PowiainaNum(layers2);
-        if (!layers.isInt() || layers.lt(0) || layers.isNaN()) return PowiainaNum.NaN;
-        if (layers.eq(1)) return new PowiainaNum("10^^^(10^)^7625597484984 3638334640023.7783");else if (layers.lte(MSI)) {
-          return new PowiainaNum("(10{!})^".concat(layers.toNumber(), " 10^^^(10^)^7625597484984 3638334640023.7783"));
-        } else {
-          return PowiainaNum.BEAF(3, layers, 1, 2);
-        }
-      }
-    }]);
-  }(); //#endregion
-  //#region constants
-  /**
-   * Zero
-   */
-  PowiainaNum.ZERO = new PowiainaNum({
-    array: arrays.ZERO,
-    small: true,
-    layer: 0,
-    sign: 0
-  });
-  /**
-   * One
-   */
-  PowiainaNum.ONE = new PowiainaNum({
-    array: [{
-      arrow: 0,
-      expans: 1,
-      megota: 1,
-      repeat: 1
-    }],
-    small: false,
-    layer: 0,
-    sign: 1
-  });
-  /**
-   * The value of the largest integer n such that n and n + 1 are both
-   * exactly representable as a Number value = 9007199254740991 = 2^53 − 1.
-   */
-  PowiainaNum.MSI = new PowiainaNum(MSI);
-  /**
-   * MSI's reciprocate value, = 1/9007199254740991.
-   */
-  PowiainaNum.MSI_REC = function () {
-    var obj = new PowiainaNum(MSI);
-    obj.small = true;
     return obj;
-  }();
-  /**
-   * 10^(MSI) = 10^9007199254740991.
-   */
-  PowiainaNum.E_MSI = new PowiainaNum({
-    array: [{
-      arrow: 0,
-      expans: 1,
-      megota: 1,
-      repeat: MSI
-    }, {
-      arrow: 1,
-      expans: 1,
-      megota: 1,
-      repeat: 1
-    }],
-    small: false,
-    layer: 0,
-    sign: 1
-  });
-  /**
-   * 10^10^(MSI) = 10^10^9007199254740991.
-   */
-  PowiainaNum.EE_MSI = new PowiainaNum({
-    array: [{
-      arrow: 0,
-      expans: 1,
-      megota: 1,
-      repeat: MSI
-    }, {
-      arrow: 1,
-      expans: 1,
-      megota: 1,
-      repeat: 2
-    }],
-    small: false,
-    layer: 0,
-    sign: 1
-  });
-  /**
-   * 10^(MSI) 's reciprocate value, = 10^-9007199254740991.
-   */
-  PowiainaNum.E_MSI_REC = new PowiainaNum({
-    array: [{
-      arrow: 0,
-      expans: 1,
-      megota: 1,
-      repeat: MSI
-    }, {
-      arrow: 1,
-      expans: 1,
-      megota: 1,
-      repeat: 1
-    }],
-    small: true,
-    layer: 0,
-    sign: 1
-  });
-  /**
-   * Tetrated MSI, = 10↑↑9007199254740991.
-   */
-  PowiainaNum.TETRATED_MSI = new PowiainaNum({
-    array: [{
-      arrow: 0,
-      expans: 1,
-      megota: 1,
-      repeat: 1e10
-    }, {
-      arrow: 1,
-      expans: 1,
-      megota: 1,
-      repeat: MSI - 2
-    }],
-    small: false,
-    layer: 0,
-    sign: 1
-  });
-  /**
-   * Pentated MSI, = 10↑↑↑9007199254740991.
-   */
-  PowiainaNum.PENTATED_MSI = new PowiainaNum({
-    array: [{
-      arrow: 0,
-      expans: 1,
-      megota: 1,
-      repeat: 10
-    }, {
-      arrow: 2,
-      expans: 1,
-      megota: 1,
-      repeat: MSI - 1
-    }],
-    small: false,
-    layer: 0,
-    sign: 1
-  });
-  /**
-   * Tritri, = 3↑↑↑3 = power tower with height 7625597484987 base 3.
-   */
-  PowiainaNum.TRITRI = new PowiainaNum({
-    small: false,
-    layer: 0,
-    sign: 1,
-    array: [newOperator(3638334640023.7783, 0, 1, 1), newOperator(7625587484984, 1, 1, 1)]
-  });
-  /**
-   * The Graham's Number, = G^64(4)
-   *
-   * = 3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{
-   * 3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3{3↑↑↑↑3
-   * }3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3
-   * }3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3}3
-   */
-  PowiainaNum.GRAHAMS_NUMBER = new PowiainaNum("(10{!})^63 10^^^(10^)^7625597484984 3638334640023.7783");
-  /**
-   * Positive Infinity.
-   */
-  PowiainaNum.POSITIVE_INFINITY = new PowiainaNum(Infinity);
-  /**
-   * Negative Infinity.
-   */
-  PowiainaNum.NEGATIVE_INFINITY = new PowiainaNum(-Infinity);
-  PowiainaNum.NaN = new PowiainaNum({
-    array: [{
-      arrow: 0,
-      expans: 1,
-      megota: 1,
-      repeat: NaN
-    }],
-    small: false,
-    layer: 0,
-    sign: 0
-  });
-  /**
-   * The mathematical constant e. This is Euler's number, the base of natural logarithms.
-   */
-  PowiainaNum.E = new PowiainaNum(Math.E);
-  /**
-   * The natural logarithm of 2 = ln(2).
-   */
-  PowiainaNum.LN2 = new PowiainaNum(Math.LN2);
-  /**
-   * The natural logarithm of 10.
-   */
-  PowiainaNum.LN10 = new PowiainaNum(Math.LN10);
-  /**
-   * The base-2 logarithm of e = log_2(e).
-   */
-  PowiainaNum.LOG2E = new PowiainaNum(Math.LOG2E);
-  /**
-   * The base-10 logarithm of e = log_10(e).
-   */
-  PowiainaNum.LOG10E = new PowiainaNum(Math.LOG10E);
-  /**
-   * Pi(). This is the ratio of the circumference of a circle to its diameter.
-   */
-  PowiainaNum.PI = new PowiainaNum(Math.PI);
-  /**
-   * The square root of 0.5, or, equivalently, one divided by the square root of 2.
-   *
-   * = (√2)/2 = √(0.5)
-   */
-  PowiainaNum.SQRT1_2 = new PowiainaNum(Math.SQRT1_2);
-  /**
-   * The square root of 2 = √2.
-   */
-  PowiainaNum.SQRT2 = new PowiainaNum(Math.SQRT2);
-  PowiainaNum.maxOps = 100;
-  PowiainaNum.POW_2_44_MOD_PI = 1.701173079953;
-  //#endregion
-  PowiainaNum.arrowFuncMap = new Map();
-  PowiainaNum.beafFuncMap = new Map();
-  //#region configurations
-  /**
-   * If you set this config to true,
-   *  the `fromString` method will try to parse the string to `PowiainaNum` class with `break_eternity.js` similar `fromString` method, if cannot parse correctly, the program will use `PowiainaNum.js` `fromString` method.
-   */
-  PowiainaNum.usingBreakEternityLikeFromString = true;
-  /**
-   * If you set this config to true, the `constructor` method will return Zero instead of NaN when call new PowiainaNum() with no arguments.
-   */
-  PowiainaNum.blankArgumentConstructorReturnZero = false;
-  /**
-   * If you set this config to true, when calucation returns NaN, the program will throw error.
-   */
-  PowiainaNum.throwErrorOnResultNaN = false;
-  /**
-   * If you set this config to true, it will turn off replacement of string, e.g replace e^x to 10^^x
-   */
-  PowiainaNum.vanilla = false;
+  }
 
-  exports.arraySortFunction = arraySortFunction;
-  exports["default"] = PowiainaNum;
-  exports.mergeSameArrays = mergeSameArrays;
-  exports.newOperator = newOperator;
+  function config(obj) {
+    if (!obj || typeof obj !== 'object') {
+      throw Error(metaNumError + 'Object expected');
+    }
+    var i, p, v,
+      ps = [
+        'maxRows', 1, 100,
+        'maxCols', 1, 100,
+        'maxArrow', 1, Number.MAX_SAFE_INTEGER,
+        'serializeMode', 0, 1,
+        'debug', 0, 2
+      ];
+    for (i = 0; i < ps.length; i += 3) {
+      if ((v = obj[p = ps[i]]) !== void 0) {
+        if (Math.floor(v) === v && v >= ps[i + 1] && v <= ps[i + 2]) this[p] = v;
+        else throw Error(invalidArgument + p + ': ' + v);
+      }
+    }
+    return this;
+  }
 
-  Object.defineProperty(exports, '__esModule', { value: true });
+  MetaNum = clone(MetaNum);
+  MetaNum = defineConstants(MetaNum);
+  MetaNum['default'] = MetaNum.MetaNum = MetaNum;
 
-}));
+  if (typeof define == 'function' && define.amd) {
+    define(function () {
+      return MetaNum;
+    });
+  } else if (typeof module != 'undefined' && module.exports) {
+    module.exports = MetaNum;
+  } else {
+    if (!globalScope) {
+      globalScope = typeof self != 'undefined' && self && self.self == self
+        ? self : Function('return this')();
+    }
+    globalScope.MetaNum = MetaNum;
+  }
+})(this);

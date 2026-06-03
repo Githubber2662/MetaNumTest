@@ -10,8 +10,8 @@
         document.getElementById("button").onclick=function (){	
           var e=document.getElementById("input").value;	
           var q;	
-          if (e[0]=="[") q = new PowiainaNum(JSON.parse(e));	
-          else q = new PowiainaNum(e);	
+          if (e[0]=="[") q = new MetaNum(JSON.parse(e));	
+          else q = new MetaNum(e);	
           document.getElementById("output").innerHTML=q+"<br>"+q.toNumber()+"<br>"+JSON.stringify(q.array);	
         }	
         document.getElementById("button2").onclick=function (){	
@@ -169,7 +169,7 @@
     </style>
 </head>
 <body>
-    <div class="container">
+    <!--<div class="container">
         <h1>5-Term BEAF Calculator</h1>
         <div style="position: fixed; bottom: 10px; left: 10px; font-size: 12px; color: #666;">by VeryrrDefine, English translation and 5-term version by ryanleonels</div>
         <div style="position: fixed; bottom: 21px; left: 10px; font-size: 12px; color: #666;">modified from <a href="https://github.com/xhyadofai/GrahalCalculator/blob/main/index.html">https://github.com/xhyadofai/GrahalCalculator/blob/main/index.html</a></div>
@@ -187,7 +187,7 @@
         <button id="calculate">Calculate</button>
         <button class="info-btn" id="symbolInfo">What do the symbols mean?</button>
         
-        <!-- Symbol Explanation Pop-Up -->
+        Symbol Explanation Pop-Up 
         <div id="symbolModal" class="modal">
             <div class="modal-content">
                 <span class="close">&times;</span>
@@ -195,7 +195,7 @@
             </div>
         </div>
         <div>
-            Big number library source (PowiainaNum.js): By <a href="https://github.com/VeryrrDefine/PowiainaNum.js">VeryrrDefine</a>, it has support for 5 BEAF terms.
+            Big number library source (MetaNum.js): By <a href="https://github.com/VeryrrDefine/PowiainaNum.js">VeryrrDefine</a>, it has support for 5 BEAF terms.
         </div>
         <div class="warning">
             <strong>Note:</strong> 5-term BEAF have extremely large values, it is currently unclear whether the number library can properly display them. The calculation process may cause a brief browser lag, especially on lower-performance devices.
@@ -208,9 +208,8 @@
         
         <div class="result" id="result"></div>
         <div>
-            <a href="index.html">Go back to the 4-Term BEAF Calculator</a>
         </div>
-    </div>
+    </div> -->
     <div class="code">
       String or Array to big number<br>
       <input type="text" id="input" value="10" style="width:95%;height:40px;"><button id="button">Run</button>
@@ -219,8 +218,8 @@
       <input type="text" id="input2" value="10" style="width:95%;height:40px;"><button id="button2">Run</button>
       <div id="output2">Output(eval()) here</div><br>
     </div>
-    <script>
-        PowiainaNum = PowiainaNum.default;
+    <!-- <script>
+        MetaNum = MetaNum.default;
         document.addEventListener('DOMContentLoaded', function() {
             const calculateBtn = document.getElementById('calculate');
             const numberAInput = document.getElementById('number_a');
@@ -289,6 +288,6 @@
                 displayResults(numberAInput.value, numberBInput.value, numberCInput.value, numberDInput.value, numberEInput.value, false);
             });
         });
-    </script>
+    </script> -->
 </body>
 </html>

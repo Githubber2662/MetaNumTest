@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5-Term BEAF Calculator</title>
+    <script src="PowiainaNum.js"></script>
+        <script>	
+      window.onload=function (){
+        document.getElementById("button").onclick=function (){	
+          var e=document.getElementById("input").value;	
+          var q;	
+          if (e[0]=="[") q = new PowiainaNum(JSON.parse(e));	
+          else q = new PowiainaNum(e);	
+          document.getElementById("output").innerHTML=q+"<br>"+q.toNumber()+"<br>"+JSON.stringify(q.array);	
+        }	
+        document.getElementById("button2").onclick=function (){	
+          document.getElementById("output2").innerHTML=Function(document.getElementById("input2").value)();	
+        }
+      };
+    </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 30%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: inline;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin-top: 20px;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+        }
+        .result-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+        }
+        .warning {
+            color: #f44336;
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #ffebee;
+            border-radius: 4px;
+        }
+        .loading {
+            text-align: center;
+            display: none;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 2s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* 弹窗样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 800px;
+            border-radius: 8px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+        }
+        
+        .symbol-explanation {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .symbol-explanation h3 {
+            color: #2196F3;
+            margin-bottom: 10px;
+        }
+        
+        .info-btn {
+            background-color: #2196F3;
+        }
+        
+        .info-btn:hover {
+            background-color: #0b7dda;
+        }
+        
+        .formula {
+            font-family: "Courier New", monospace;
+            background-color: #f5f5f5;
+            padding: 5px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>5-Term BEAF Calculator</h1>
+        <div style="position: fixed; bottom: 10px; left: 10px; font-size: 12px; color: #666;">by VeryrrDefine, English translation and 5-term version by ryanleonels</div>
+        <div style="position: fixed; bottom: 21px; left: 10px; font-size: 12px; color: #666;">modified from <a href="https://github.com/xhyadofai/GrahalCalculator/blob/main/index.html">https://github.com/xhyadofai/GrahalCalculator/blob/main/index.html</a></div>
+        
+        <div class="input-group">
+            <label>Calculate {a, b, c, d, e}:</label>
+            <label for="number_a">a: <input id="number_a" value="10"></label>
+            <label for="number_b">b: <input id="number_b" value="10"></label>
+            <label for="number_c">c: <input id="number_c" value="10"></label>
+            <label for="number_d">d: <input id="number_d" value="10"></label>
+            <label for="number_e">e: <input id="number_e" value="2"></label>
+            <label for="reciprocated">reciprocate? <input id="reciprocate" type="checkbox"></label>
+        </div>
+        
+        <button id="calculate">Calculate</button>
+        <button class="info-btn" id="symbolInfo">What do the symbols mean?</button>
+        
+        <!-- Symbol Explanation Pop-Up -->
+        <div id="symbolModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>Not done yet</h2>
+            </div>
+        </div>
+        <div>
+            Big number library source (PowiainaNum.js): By <a href="https://github.com/VeryrrDefine/PowiainaNum.js">VeryrrDefine</a>, it has support for 5 BEAF terms.
+        </div>
+        <div class="warning">
+            <strong>Note:</strong> 5-term BEAF have extremely large values, it is currently unclear whether the number library can properly display them. The calculation process may cause a brief browser lag, especially on lower-performance devices.
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Calculation in progress, please wait...</p>
+        </div>
+        
+        <div class="result" id="result"></div>
+        <div>
+            <a href="index.html">Go back to the 4-Term BEAF Calculator</a>
+        </div>
+    </div>
+    <div class="code">
+      String or Array to big number<br>
+      <input type="text" id="input" value="10" style="width:95%;height:40px;"><button id="button">Run</button>
+      <div id="output">Output here</div><br>
+      Arbitrary code execution();<br>
+      <input type="text" id="input2" value="10" style="width:95%;height:40px;"><button id="button2">Run</button>
+      <div id="output2">Output(eval()) here</div><br>
+    </div>
+    <script>
+        PowiainaNum = PowiainaNum.default;
+        document.addEventListener('DOMContentLoaded', function() {
+            const calculateBtn = document.getElementById('calculate');
+            const numberAInput = document.getElementById('number_a');
+            const numberBInput = document.getElementById('number_b');
+            const numberCInput = document.getElementById('number_c');
+            const numberDInput = document.getElementById('number_d');
+            const numberEInput = document.getElementById('number_e');
+            const resultDiv = document.getElementById('result');
+            const loadingDiv = document.getElementById('loading');
+            const modal = document.getElementById('symbolModal');
+            const infoBtn = document.getElementById('symbolInfo');
+            const span = document.getElementsByClassName('close')[0];
+            
+            // Pop-up control
+            infoBtn.onclick = function() {
+                modal.style.display = "block";
+            }
+            
+            span.onclick = function() {
+                modal.style.display = "none";
+            }
+            
+            window.onclick = function(event) {
+                if (event.target == modal) {
+                    modal.style.display = "none";
+                }
+            }
+            
+            
+            // Format and display the results
+            function displayResults(a, b, c, d, e){
+                resultDiv.innerHTML = '';
+                loadingDiv.style.display = 'block';
+                
+                // Use setTimeout to give the UI a chance to update
+                setTimeout(() => {
+                    try {
+                        const result = PowiainaNum.BEAF(a,b,c,d,e);
+                        const formattedResult = result.toString();
+                        
+                        const resultItem = document.createElement('div');
+                        resultItem.className = 'result-item';
+
+                        //I couldn't find the JS library to beautify the result, so I'll just leave it as is
+                        if(document.getElementById("reciprocate").checked) {
+                            resultItem.innerHTML = `1 divided by {${a}, ${b}, ${c}, ${d}, ${e}}=${result.rec().toString()}`;
+                        }
+                        else {
+                            resultItem.innerHTML = `{${a}, ${b}, ${c}, ${d}, ${e}}=${formattedResult}`;
+                        }
+                        resultDiv.appendChild(resultItem);
+                    } catch (error) {
+                        const errorItem = document.createElement('div');
+                        errorItem.className = 'warning';
+                        errorItem.textContent = `Calculation Error: ${error.message}`;
+                        resultDiv.appendChild(errorItem);
+                    } finally {
+                        loadingDiv.style.display = 'none';
+                    }
+                }, 100);
+            }
+            
+            // Calculate button click events
+            calculateBtn.addEventListener('click', function() {
+                
+                displayResults(numberAInput.value, numberBInput.value, numberCInput.value, numberDInput.value, numberEInput.value, false);
+            });
+        });
+    </script>
+</body>
+</html>

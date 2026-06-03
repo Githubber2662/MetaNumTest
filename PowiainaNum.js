@@ -1,4 +1,4 @@
-/Author: dlsdl v1.1
+//Author: dlsdl v1.1
 //Add support for very small numbers ,add more hyper operations and fix bugs
 //Code snippets and templates from OmegaNum.js
 

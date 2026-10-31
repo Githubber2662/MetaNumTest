@@ -1,5 +1,5 @@
-//Author: dlsdl v2.0
-//v2.0: Add hyper-root & hyper-log, hardy function, fractional hyperoperation inputs, fix BEAF operation level and format
+//Author: dlsdl v2.1.2
+//v2.1.2 Fix: round-trip @Aa1/#Aa1 and alpha-Gamma sub-unit forms; fix(format): exact token form for non-integer multi-a layers and past multiLetterLimit
 //Code snippets and templates from OmegaNum.js
 
 ;(function (globalScope) {
@@ -227,6 +227,33 @@
   var log10LongString = function (str) {
     return Math.log10(Number(str.substring(0, LONG_STRING_MIN_LENGTH))) + (str.length - LONG_STRING_MIN_LENGTH);
   };
+
+  // Sub-unit canonical form: 0 < |v| < 1 is stored as the RECIPROCAL with
+  // sign 2 / -2 (README: sign 2 / -2 == 0~1 / -1~0).  _skipCanon lets rec()
+  // produce that reciprocal without this rule turning it back.
+  var _skipCanon = 0;
+  function canonicalizeSubUnit(x) {
+    if (_skipCanon) return x;
+    if (x.layer !== 0 || x.array.length !== 1) return x;
+    var r = x.array[0];
+    if (x.sign !== 1 && x.sign !== -1) return x;   // already reciprocal-encoded
+    if (r.length === 1) {
+      var v = r[0];
+      if (!(typeof v === 'number') || !isFinite(v) || v <= 0 || v >= 1) return x;
+      r[0] = 1 / v;
+      x.sign = x.sign === -1 ? -2 : 2;
+      return x;
+    }
+    if (r.length === 2 && r[1] === 1) {
+      // 10^e with a negative exponent is sub-unit: store 10^(-e) as reciprocal
+      var e = r[0];
+      if (!(typeof e === 'number') || !isFinite(e) || e >= 0) return x;
+      r[0] = -e;
+      x.sign = x.sign === -1 ? -2 : 2;
+      return x;
+    }
+    return x;
+  }
 
   P.normalize = function () {
     var b;
@@ -469,6 +496,34 @@
     return x;
   };
 
+  // Apply the sub-unit canonical form to a PUBLIC result (constructor input,
+  // basic arithmetic).  Deliberately not part of normalize(): internal
+  // intermediates (transcendentals, slog, gamma, hardy's coefficients) read r0
+  // structurally, so canonicalizing there broke them.
+  function canonicalizeResult(x) {
+    if (x instanceof MetaNum) canonicalizeSubUnit(x);
+    return x;
+  }
+
+  // Constructor that never applies the sub-unit canonical form — for engine
+  // internals whose values are consumed STRUCTURALLY (transcendentals' results
+  // like log10(2) = 0.301, slog, gamma, pent_log, hardy's fractional
+  // coefficients); canonicalizing them turned r0[0] from 0.301 into 3.32.
+  function rawMetaNum(v) {
+    _skipCanon++;
+    try { return new MetaNum(v); } finally { _skipCanon--; }
+  }
+
+  // Run fn with the sub-unit canonical form suppressed — for the engine
+  // functions that CONSUME sub-unit magnitudes structurally (gamma's series,
+  // slog's log10 chain, layeradd/pentate inverses): a canonicalized
+  // intermediate (log10(2) → r0 [3.32] instead of [0.301]) produced garbage.
+  // The PRODUCERS stay canonicalized, so the public contract holds.
+  function rawBody(fn, self, args) {
+    _skipCanon++;
+    try { return fn.apply(self, args || []); } finally { _skipCanon--; }
+  }
+
   var standardizeMessageSent = false;
   P.standardize = function () {
     if (!standardizeMessageSent) console.warn(metaNumError + "'standardize' method is being deprecated in favor of 'normalize' and will be removed in the future!"), standardizeMessageSent = true;
@@ -500,6 +555,19 @@
 
     if (this.array[0] && isNaN(this.array[0][0])) return NaN;
     if (other.array[0] && isNaN(other.array[0][0])) return NaN;
+
+    // Plain finite numerics (any sign, including the sub-unit encoding 2/-2)
+    // compare as real numbers.  The structural path below reads r0 as the
+    // magnitude and only inverts at the very end, so a sign-2 value like 0.2
+    // (stored as r0 = [5]) used to compare as 5 — every `lt`/`gt`/`eq` against a
+    // sub-unit value was wrong.
+    var tNum = plainNumericValue(this);
+    var oNum = plainNumericValue(other);
+    if (tNum !== null && oNum !== null) {
+      if (tNum < oNum) return -1;
+      if (tNum > oNum) return 1;
+      return 0;
+    }
 
     var tInf = this.array[0] && this.array[0][0] === Infinity;
     var oInf = other.array[0] && other.array[0][0] === Infinity;
@@ -547,14 +615,11 @@
     while (tRows > 1 && isZeroArr(this.array[tRows - 1])) tRows--;
     while (oRows > 1 && isZeroArr(other.array[oRows - 1])) oRows--;
 
-    // Compare ordinal rows (index >= 1) as Cantor normal form. Rows are kept
-    // sorted by level ascending, so the leading (highest-level) term is last and
-    // dominates: a single ω-level row (length >= 3, e.g. [1,0,1]) is larger than
-    // any number of finite-level rows (length 2, e.g. [count, finiteLevel]),
-    // because 10{ω}10 is infinite while 10{n}10 is finite. Deciding by row count
-    // alone would wrongly rank 99 finite-level rows above 1 ω-level row, so we
-    // descend from the top, cancelling equal leading rows, and decide at the
-    // first row whose level/count differs (cmpArr encodes level then count).
+    // Compare ordinal rows (index >= 1) as CNF: rows are sorted by level
+    // ascending, so the leading (highest-level) term is last and dominates — one
+    // ω-level row ([1,0,1]) beats any number of finite-level rows.  Descend from
+    // the top, cancel equal leading rows, decide at the first differing
+    // level/count (cmpArr encodes level then count).
     var i = tRows - 1;
     var j = oRows - 1;
     while (i >= 1 || j >= 1) {
@@ -796,6 +861,30 @@
     return x.sign === 2 || x.sign === -2;
   }
 
+  // The plain r0 magnitude as the engine's own numeric routines expect it:
+  // for a sub-unit value (sign 2/-2) r0 holds the RECIPROCAL, so unwrap it.
+  // Use this wherever a function does `isSimple(x) ? x.array[0][0] : …` to feed
+  // a float routine — otherwise 0.5 (r0 [2]) is read as 2.
+  function magnitudeOf(x) {
+    if (!isSmall(x)) return x.array[0][0];
+    return 1 / x.array[0][0];
+  }
+
+  // Real value of a plain finite numeric MetaNum, or null when the value is
+  // structured (layer > 0, ordinal rows, E/power-tower r0) and must go through
+  // the structural comparison.  sign 2/-2 is the sub-unit encoding: r0 holds
+  // the reciprocal, so the value is 1/r0 (negated for -2).
+  function plainNumericValue(x) {
+    if (x.layer !== 0 || x.array.length !== 1) return null;
+    var r0 = x.array[0];
+    if (r0.length !== 1) return null;
+    var v = r0[0];
+    if (typeof v !== 'number' || !isFinite(v) || v === 0) return null;
+    if (x.sign === 2) return 1 / v;
+    if (x.sign === -2) return -1 / v;
+    return x.sign === -1 ? -v : v;
+  }
+
   function isNumeric(x) {
     return x.layer === 0 && x.array.length === 1 &&
            x.array[0].length === 1 && isFinite(x.array[0][0]);
@@ -857,15 +946,11 @@
     return x;
   }
 
-  // Like toNumber(), but returns the actual finite JS value for E-notation
-  // numbers (e.g. 10^16 stored as [[16,1]]) instead of Infinity. This is used
-  // by hyperoperation functions (expande/multiexpande/powerexpande) to compute
-  // iteration counts `count = y - 2` when y is a large-but-finite MetaNum.
-  // toNumber() returns Infinity whenever r0.length > 1 (E-notation) or the
-  // array has ordinal rows, which is too conservative for count extraction:
-  // 10^16 is a perfectly finite JS number. We only return Infinity for genuine
-  // ordinals (layer>0 or array.length>1) or values too large for any JS number
-  // (tetration+ or 10^(>=309)); the caller falls back to the ordinal branch.
+  // Like toNumber(), but returns the finite JS value for E-notation numbers
+  // (10^16 = [[16,1]]) instead of Infinity — used to extract iteration counts
+  // (count = y-2) in expande/multiexpande/powerexpande.  Infinity only for
+  // genuine ordinals (layer>0 or array.length>1) or values beyond double range
+  // (tetration+, 10^(>=309)); the caller then takes the ordinal branch.
   function metaFiniteCount(y) {
     if (y.isNaN()) return NaN;
     if (y.layer > 0) return Infinity;            // ω^ω^... tower
@@ -1011,9 +1096,11 @@
     var domMul = layerDominant(x, other);
     if (domMul !== null) return domMul.clone().normalize();
 
-    if (isSimple(x) && isSimple(other) && !isSmall(x) && !isSmall(other)) {
-      var nx = x.array[0][0];
-      var ny = other.array[0][0];
+    if (isSimple(x) && isSimple(other)) {
+      // magnitudeOf: sub-unit operands (sign 2/-2) store the reciprocal, so
+      // read the real values — otherwise 0.5·0.5 multiplied 2·2 = 4.
+      var nx = magnitudeOf(x);
+      var ny = magnitudeOf(other);
       var n = nx * ny;
       if (isFinite(n) && n !== 0 && Math.abs(n) <= MAX_SAFE_INTEGER) {
         if (Math.abs(n) < 1) return new MetaNum(1 / Math.abs(n)).rec();
@@ -1066,9 +1153,11 @@
     }
 
     if (x.eq(MetaNum.ZERO)) return MetaNum.ZERO.clone();
-    if (isSimple(x) && isSimple(other) && !isSmall(x) && !isSmall(other)) {
-      var nx = x.array[0][0];
-      var ny = other.array[0][0];
+    if (isSimple(x) && isSimple(other)) {
+      // magnitudeOf: sub-unit operands store the reciprocal — 0.5 / 0.25 must
+      // read 0.5 and 0.25, not 2 and 4.
+      var nx = magnitudeOf(x);
+      var ny = magnitudeOf(other);
       var n = nx / ny;
       if (isFinite(n) && n !== 0 && Math.abs(n) <= MAX_SAFE_INTEGER) {
         if (Math.abs(n) < 1) return new MetaNum(1 / Math.abs(n)).rec();
@@ -1111,7 +1200,10 @@
     var x = this.clone();
     // Toggle between large and small: 1↔2, -1↔-2
     x.sign = x.sign === 1 ? 2 : x.sign === 2 ? 1 : x.sign === -1 ? -2 : -1;
-    return x.normalize();
+    // _skipCanon: the reciprocal of a sub-unit value is a NORMAL value (rec(0.5)
+    // = 2) — canonicalizeSubUnit would otherwise flip it straight back.
+    _skipCanon++;
+    try { return x.normalize(); } finally { _skipCanon--; }
   };
   Q.reciprocate = Q.rec = function (x) {
     return new MetaNum(x).rec();
@@ -1137,7 +1229,12 @@
       var powVal = Math.pow(x.toNumber(), other.toNumber());
       if (Number.isFinite(powVal) && Math.abs(powVal) <= MAX_SAFE_INTEGER && powVal !== 0) return new MetaNum(powVal);
     }
-    if (x.eq(MetaNum.TEN) && !isSmall(other)) {
+    // 10^e fast path. Only for POSITIVE exponents: `other` stores its
+    // magnitude in r0 with the sign held separately, so a negative exponent
+    // (-324 → array [[324]], sign -1) must NOT be turned into 10^(+324) here.
+    // Negative exponents fall through to the log/normalise path below, which
+    // yields the sub-unit encoding (sign 2 / -2).
+    if (x.eq(MetaNum.TEN) && !isSmall(other) && other.sign === 1) {
       if (other.layer > 0 || other.array.length > 1) return other;
       var newRow0 = other.array[0].slice(0);
       newRow0[1] = (newRow0[1] || 0) + 1;
@@ -1202,7 +1299,11 @@
       if (other.mod(2).eq(MetaNum.ONE)) return x.abs().root(other).neg();
       return MetaNum.NaN.clone();
     }
-    if (isNumeric(x) && isNumeric(other)) return new MetaNum(Math.pow(x.array[0][0], 1 / other.array[0][0]));
+    if (isNumeric(x) && isNumeric(other)) {
+      // magnitudeOf: a sub-unit x (sign 2) stores the reciprocal in r0, so
+      // sqrt(0.25) must read 0.25, not the stored 4 (which gave 2).
+      return new MetaNum(Math.pow(magnitudeOf(x), 1 / magnitudeOf(other)));
+    }
     // Handle E^m format (iterated exponentiation levels)
     if (x.layer === 0 && x.array.length === 1 && x.array[0].length > 1 && isNumeric(other)) {
       var r0 = x.array[0];
@@ -1260,20 +1361,20 @@
   P.generalLogarithm = P.log10 = function () {
     if (this.isNaN() || this.sign === -1 || this.sign === -2) return MetaNum.NaN.clone();
     if (this.isInfinite()) return this;
-    if (isSmall(this)) {
-      // Small value: log10 is negative of what it would be for the normal value
-      var n = this.clone();
-      n.sign = 1; // Convert to normal positive for computation
-      var result = n.log10();
-      // Result should be negative (because log10 of a small number is negative)
-      // Need to handle this carefully - after conversion, the result is the magnitude
-      // which we need to negate
-      return result.neg();
-    }
     if (this.eq(MetaNum.ZERO)) return MetaNum.NEGATIVE_INFINITY.clone();
     if (isNumeric(this)) {
-      var lv = Math.log10(this.array[0][0]);
+      // magnitudeOf: a sub-unit operand stores the reciprocal in r0, so
+      // log10(0.5) must read 0.5, not the stored 2.
+      var lv = Math.log10(magnitudeOf(this));
       if (Number.isFinite(lv)) return new MetaNum(lv);
+    }
+    // Sub-unit E-form: sign 2/-2 with an r0 longer than 1 stores the
+    // RECIPROCAL (e.g. 10^-324 → [[324,1]] sign 2). log10(1/|x|) = -log10(|x|),
+    // and rec() unwraps the reciprocal back to the magnitude. Without this,
+    // log10(10^-324) returned +324, so 10^-324 · 10^324 became 10^648.
+    if (this.sign === 2 &&
+        this.layer === 0 && this.array.length === 1 && this.array[0].length > 1) {
+      return this.rec().log10().neg();
     }
     if (this.layer === 0 && this.array.length === 1 && this.array[0].length > 1) {
       var r0 = this.array[0];
@@ -1298,7 +1399,7 @@
     if (x.eq(MetaNum.ZERO)) return MetaNum.NEGATIVE_INFINITY.clone();
     if (x.eq(MetaNum.ONE)) return MetaNum.ZERO.clone();
     if (isNumeric(x) && isNumeric(base)) {
-      var lv = Math.log(x.array[0][0]) / Math.log(base.array[0][0]);
+      var lv = Math.log(magnitudeOf(x)) / Math.log(magnitudeOf(base));
       if (Number.isFinite(lv)) return new MetaNum(lv);
     }
     return x.log10().div(base.log10());
@@ -1308,11 +1409,14 @@
   };
 
   P.naturalLogarithm = P.ln = function () {
-    if (this.isNaN() || this.sign === -1 || this.sign === -2) return MetaNum.NaN.clone();
+    if (this.sign === -1 || this.sign === -2) return MetaNum.NaN.clone();
+    if (this.isNaN()) return MetaNum.NaN.clone();
     if (this.eq(MetaNum.ZERO)) return MetaNum.NEGATIVE_INFINITY.clone();
     if (this.isInfinite()) return this;
     if (isNumeric(this)) {
-      var lv = Math.log(this.array[0][0]);
+      // magnitudeOf: a sub-unit operand stores the reciprocal in r0, so
+      // ln(0.5) must read 0.5, not the stored 2.
+      var lv = Math.log(magnitudeOf(this));
       if (Number.isFinite(lv)) return new MetaNum(lv);
     }
     return this.log10().div(new MetaNum(Math.LOG10E));
@@ -1354,7 +1458,7 @@
     if (this.sign === -1 || this.sign === -2) return MetaNum.NaN.clone();
     if (this.isNaN() || this.isInfinite()) return this.clone();
     if (isSimple(this)) {
-      var n = this.array[0][0];
+      var n = magnitudeOf(this);   // sub-unit r0 holds the reciprocal
       if (Number.isInteger(n) && n >= 0 && n <= 100) {
         var f = 1;
         for (var i = 2; i < n; i++) f *= i;
@@ -1377,7 +1481,7 @@
     if (this.isNaN() || this.isInfinite()) return this;
     if (this.sign === -1 || this.sign === -2) return this.abs().fact().neg();
     if (isSimple(this)) {
-      var n = this.array[0][0];
+      var n = magnitudeOf(this);   // sub-unit r0 holds the reciprocal
       if (Number.isInteger(n) && n >= 0 && n <= 20) {
         var f = 1;
         for (var i = 2; i <= n; i++) f *= i;
@@ -1415,7 +1519,7 @@
       if (this.gt(MetaNum.E_MAX_SAFE_INTEGER)) return d_lambertw(this, tol, principal);
       if (isNumeric(this)) {
         try {
-          return new MetaNum(f_lambertw(this.array[0][0], tol, principal));
+          return new MetaNum(f_lambertw(magnitudeOf(this), tol, principal));
         } catch (e) {
           return MetaNum.NaN.clone();
         }
@@ -1428,7 +1532,8 @@
       if (this.abs().gt(MetaNum.E_MAX_SAFE_INTEGER)) return d_lambertw(this, tol, principal);
       if (isNumeric(this)) {
         try {
-          return new MetaNum(f_lambertw(this.sign * this.array[0][0], tol, principal));
+          return new MetaNum(f_lambertw(
+            (this.sign === -2 ? -1 : this.sign) * magnitudeOf(this.abs()), tol, principal));
         } catch (e) {
           return MetaNum.NaN.clone();
         }
@@ -1594,7 +1699,7 @@
     if (this.eq(MetaNum.ZERO)) return MetaNum.ZERO.clone();
     if (this.eq(MetaNum.ONE)) return MetaNum.ONE.clone();
     if (isSimple(this)) {
-      var v = this.array[0][0];
+      var v = magnitudeOf(this);
       if (v > 0 && v < 1) return new MetaNum(v);
       try {
         var w = f_lambertw(Math.log(v));
@@ -1846,13 +1951,9 @@
   }
 
   // Fast construction of the diagonal chain D(L) = t{L}t for a plain finite
-  // integer base t. The generic successor-rule recursion recomputes the whole
-  // chain at every level (each level re-invokes t{n-1}(t)), which is ~O(n^3)
-  // for plain diagonals (3{99}3 at maxCols=100 took ~5.5s). Unrolling rule 2
-  // once builds the identical normalized array bottom-up:
-  //   D(1) = t{1}t ; D(n+1) = t{n}^{t-1}(t) = t{n}^{t-2}(D(n))
-  // Each t{n}(D(n)) step is the engine's own structured-value fast path, so
-  // the result is array-identical to the recursive evaluation, in O(L^2).
+  // integer base t.  The generic recursion is ~O(n^3) (3{99}3 took ~5.5s);
+  // unrolling rule 2 once builds the identical array bottom-up in O(L^2):
+  //   D(1) = t{1}t ;  D(n+1) = t{n}^{t-2}(D(n))
   function canFastDiagonal(t) {
     if (t.layer !== 0 || t.array.length !== 1) return false;
     var n = t.toNumber();
@@ -1885,19 +1986,13 @@
     return r;
   }
 
-  // Convert a structured raw-application COUNT C at finite operation level n
-  // ({n}^C(10)) to the dlsdl Aa-band smooth argument α (v = 10{n+2}(α)),
-  // α ∈ [2,10). A count given canonically as 10{k}(t), t∈[1,10]:
-  //   t = 10 rewrites exactly to α-anchor 2 one level up (10{k}10=10{k+1}2);
-  //   each further level promotion is the geometric smooth-log step
-  //   f → 1 + log10(f) (the same step the low-level polarize produces).
-  // Matches dlsdl rule (iii)-(v): {99}^{10{93}10}(10) = 10{101}(2.001607…).
-  // Raw application COUNT C at operation level n ({n}^C(10)) -> the dlsdl
-  // diagonal-letter smooth argument α in [2,10) with v = 10{n+2}(α).
-  // Start from C=10{level}(t) (polarize: a scalar C starts at level 1 with
-  // t=log10(C)), then each level promotion is the geometric smooth-log step
-  // t → 1+log10(t) (exact t=10 rewrites to the α-anchor 2). The final value
-  // lands in [1,2); the diagonal mantissa is α=1+t (2 at the anchor).
+  // Convert a structured raw-application COUNT C at finite level n ({n}^C(10))
+  // to the dlsdl Aa-band smooth argument α (v = 10{n+2}(α)), α ∈ [2,10).
+  // Polarize C to 10{level}(t) (a scalar C starts at level 1, t=log10(C)); each
+  // level promotion is the smooth-log step t → 1+log10(t), and the exact anchor
+  // t=10 rewrites to mantissa 2 one level up (10{k}10 = 10{k+1}2).  The final
+  // value lands in [1,2); the mantissa is α = 1+t.  Matches dlsdl rule
+  // (iii)-(v): {99}^{10{93}10}(10) = 10{101}(2.001607…).
   function countToDiagonalAlpha(C, n, r0OfC, rowsOfC) {
     var t, level;
     if (r0OfC === undefined || r0OfC === null) {
@@ -2029,12 +2124,10 @@
     return { bottom: b(), repeation: array[ptr][1], arrows: array[ptr][0] };
   }
 
-  // Canonical compact form of the smooth diagonal value 10{L}(α) with a
-  // NUMERIC α in [1,10): r0=[1] plus one finite row [α, L-1]. The fractional
-  // row count survives normalization (only r0 integer columns are floored)
-  // and polarize climbs it straight back to t=α at level L-1, so the smooth
-  // mantissa is preserved at arbitrary finite levels (used where the iterated
-  // arrow loop would MSI-dump the fraction away).
+  // Canonical compact form of the smooth diagonal 10{L}(α), α numeric in
+  // [1,10): r0=[1] plus one finite row [α, L-1].  The fractional row count
+  // survives normalization and polarize climbs it back to t=α at level L-1, so
+  // the smooth mantissa survives at arbitrary finite levels.
   function compactSmoothValue(L, alpha) {
     var m = new MetaNum({ sign: 1, layer: 0, array: [[1], [alpha, L - 1]] });
     return m.normalize();
@@ -2046,13 +2139,10 @@
     arrows = new MetaNum(arrows);
     if (arrows.sign === -1 || arrows.sign === -2) return function () { return MetaNum.NaN.clone(); };
     if (!arrows.isint()) {
-      // Fractional hyperoperation level.
-      // Geometric interpolation per README rule (i): level n+f acts as the (n+1)-level
-      // op on a geometrically interpolated argument — for the canonical
-      // diagonal 10{n+f}10 = 10{n+1}(2·5^f). General anchors: θ0 satisfies
-      // x{n+1}θ0 = x{n}y (recovered via hyper_log), θ1 = y, θf = θ0·(y/θ0)^f,
-      // so x{n+f}y = x{n+1}(θf), continuous in f with
-      // x{n}y at f=0 and x{n+1}y at f=1.
+      // Fractional hyperoperation level — geometric interpolation (README
+      // rule (i)): level n+f is the (n+1)-level op on the interpolated argument
+      // θf = θ0·(y/θ0)^f, where θ0 solves x{n+1}θ0 = x{n}y (via hyper_log) and
+      // θ1 = y; the canonical diagonal 10{n+f}10 = 10{n+1}(2·5^f).
       if (arrows.gte(MetaNum.ONE)) {
         var nLev = arrows.floor();
         var frac = arrows.sub(nLev);
@@ -2063,9 +2153,21 @@
           if (other.eq(MetaNum.ONE)) return self.clone();
           if (frac.eq(MetaNum.ZERO)) return self.arrow(nLev)(other);
           var target = self.arrow(nLev)(other);
-          var theta0 = target.hyper_log(self)(nLev.add(MetaNum.ONE));
+          var lev1 = nLev.add(MetaNum.ONE);
+          var theta0 = hyperAnchorReal(self, lev1, target);
+          if (theta0 === null) theta0 = target.hyper_log(self)(lev1);
+          if (theta0.isNaN() || !(theta0.gt(MetaNum.ZERO))) theta0 = MetaNum.ONE.clone();
           var theta = theta0.mul(other.div(theta0).pow(frac));
-          return self.arrow(nLev.add(MetaNum.ONE))(theta);
+          var res = self.arrow(lev1)(theta);
+          if (hasFractionOutsideR00(res)) {
+            // levels that diagonalize into ordinal rows would keep the
+            // interpolated argument as a fractional row count — fall back to the
+            // integer argument so the "only array[0][0] is fractional" contract
+            // holds (floor is exact again at f = 1, where θ = y)
+            var ti = Math.max(1, Math.floor(theta.toNumber()));
+            if (isFinite(ti)) res = self.arrow(lev1)(new MetaNum(ti));
+          }
+          return res;
         };
       }
       return function () { return MetaNum.NaN.clone(); };
@@ -2135,16 +2237,12 @@
         if (alphaC !== null && alphaC >= 2) return compactSmoothValue(arrowsNum + 1, alphaC);
       }
       if (arrowsNum >= MetaNum.maxCols) {
-        // Finite arrow level beyond r0 capacity:
-        // expand the level chain exactly as far as the array budget allows —
-        //   r0 filled to maxCols (levels 1..maxCols-1, the top one being the
-        //   anchor level L-1 col) + [count, level] rows for levels
-        //   maxCols..L-1 (maxRows-1 rows max; the top level L itself is the
-        //   10{L}2 = 10{L-1}10 anchor and takes no row) —
-        // and approximate beyond the budget: keep the LARGEST maxRows-1
-        // ordinal rows, the ARRAY's second row (first-kept ordinal row) first column +1,
-        // first row [10].
-        // Swallowing: a finite level sits below any existing ω-level row.
+        // Finite arrow level beyond r0 capacity: expand exactly as far as the
+        // budget allows (r0 to maxCols + [count, level] rows for the rest; the
+        // top level L is the 10{L}2 = 10{L-1}10 anchor and takes no row), then
+        // approximate — keep the LARGEST maxRows-1 rows, bump the first kept
+        // row's count by 1 (truncation marker), base [10].  A finite level sits
+        // below any existing ω-level row (swallowing).
         var j = t.max(other).clone();
         if (j.layer > 0) return j; // ω^ω-tower swallows any finite level
         var idx = -1;
@@ -2181,14 +2279,11 @@
           j.normalize();
           return j;
         }
-        // plain finite base: expand the diagonal chain bottom-up.
-        // Exact law (matches the engine's own low-level path and the
-        // reference): x{L}y = x{L-1}^{y-2}(x{L-1}x), so the top level L-1
-        // carries (y-2) ops and every level below — the x{L-1}x tail —
-        // carries (x-2) ops:
-        //   3{9}3 → 1 op/level, 4{9}4 → 2, 10{25}10 → 8 ops/level (the
-        //   canonical all-8s form). The top level L itself is the
-        //   10{L}2 = 10{L-1}10 anchor and takes no row.
+        // Plain finite base: expand the diagonal chain bottom-up —
+        // x{L}y = x{L-1}^{y-2}(x{L-1}x), so the top level L-1 carries (y-2) ops
+        // and every level below (the x{L-1}x tail) carries (x-2): 3{9}3 → 1
+        // op/level, 10{25}10 → 8 (the canonical all-8s form).  The top level L
+        // is the 10{L}2 = 10{L-1}10 anchor and takes no row.
         var subDepth = MetaNum.maxCols - 1;
         var xBase = t.toNumber();
         var yBase = other.toNumber();
@@ -2306,11 +2401,9 @@
       var fastDiag = isFinite(y) && Math.floor(y) === y && canFastDiagonal(t);
       if (arrowsNum >= 23 && y !== Math.floor(y) && Math.floor(y) > 2) {
         // Large integer part with a fractional tail at a high level: the tail
-        // would be amplified by the many iterations (e.g. 10{69}69.6 ≈
-        // 10{69}10), so use the discrete 10 anchor (accepted convention).
-        // y with floor ≤ 2 keeps the smooth fractional path — the recursion
-        // bottoms out numerically and carries the smooth Aa-diagonal mantissa
-        // (e.g. 10{101}(2.001607)).
+        // would be amplified by the many iterations (10{69}69.6 ≈ 10{69}10), so
+        // use the discrete 10 anchor.  y with floor ≤ 2 keeps the smooth path
+        // (carries the Aa-diagonal mantissa, e.g. 10{101}(2.001607)).
         y = 10;
         fastDiag = false;
       }
@@ -2364,14 +2457,11 @@
   };
 
   // ==================== hyper_log / hyper_root ====================
-  // Inverses of the hyperoperation a{b}c = d (arrow-style chained API):
-  //   d.hyper_log(a)(b)  = c     (recover the right operand / argument)
-  //   d.hyper_root(c)(b) = a     (recover the base / left operand)
-  // b = 0 and b = 1 use exact division and logarithms; b ≥ 2 bisects on the
-  // monotone arrow engine (issues.md addition 2). Note: for levels b beyond
-  // maxCols the forward arrow diagonalizes into one [1|b] marker row and the
-  // argument is no longer recoverable — the bisection then returns the
-  // smallest argument that reproduces d.
+  // Inverses of a{b}c = d:  d.hyper_log(a)(b) = c,  d.hyper_root(c)(b) = a.
+  // b = 0/1 use exact division and logarithms; b ≥ 2 bisects on the monotone
+  // arrow engine.  For levels b beyond maxCols the forward arrow diagonalizes
+  // into one [1|b] row and the argument is not recoverable — the bisection
+  // returns the smallest argument reproducing d.
   function hyperBisect(f, target, bound) {
     // smallest integer x ≥ 1 with f(x) ≥ target (f monotone nondecreasing)
     var lo = MetaNum.ONE.clone();
@@ -2391,6 +2481,27 @@
       else hi = mid.clone();
     }
     return hi;
+  }
+
+  // Continuous inverse — the interpolation ANCHOR of a fractional level: the
+  // real c with a{b}c = d, bisected on doubles.  hyperBisect only searches
+  // integers and overshoots (θ0 = 2 where the truth is 1.0414), which made the
+  // geometric interpolation run BACKWARDS and broke the monotonicity of x{y}y
+  // (arrow(10,1.5,1.5) < arrow(10,1.1,1.1)).  null when d cannot be bracketed.
+  function hyperAnchorReal(a, b, d) {
+    try {
+      var lo = 0, hi = 1, it = 0;
+      while (it++ < 60 && a.arrow(b)(new MetaNum(hi)).lt(d)) { lo = hi; hi = hi * 2; }
+      if (!isFinite(hi) || hi > 1e15) return null;
+      for (var k = 0; k < 80; k++) {
+        var mid = (lo + hi) / 2;
+        if (a.arrow(b)(new MetaNum(mid)).lt(d)) lo = mid; else hi = mid;
+      }
+      var r = new MetaNum((lo + hi) / 2);
+      return r.isNaN() ? null : r;
+    } catch (e) {
+      return null;
+    }
   }
 
   P.hyper_log = function (a) {
@@ -2624,19 +2735,16 @@
   };
 
   // ---------------------------------------------------------------------------
-  // Unified ordinal hyperoperation engine — implements README rules 1-4:
+  // Unified ordinal hyperoperation engine — README rules 1-4:
   //   rule 1: x{0}y = x*y
   //   rule 2: x{α}1 = x;  x{α}y = (x{α-1}) iterated (y-1) times from x
   //   rule 3: x{λ}y = x{λ[y]}y   (fundamental sequence at y)
   //   rule 4: operations compose right-to-left
-  // Representation rules for operands/intermediates beyond MSI:
-  //   x{α}y ≈ 10{α}y when y > MSI → y itself plus one ordinal row [1|α]
-  //   (the iteration count y is unrepresentable, so it diagonalizes to a
-  //   single α-level marker — the supremum of count-limited iterations).
-  // Swallowing (right-to-left composition): applying level β to a value
-  // whose top ordinal row level is γ:
-  //   β > γ → push a new [k|β] row ; β = γ → top count += k ; β < γ → no change
-  //   (e.g. 10{ω}10{ω+2}10 = 10{ω+2}10). Counts are always capped at MSI.
+  // y > MSI: x{α}y ≈ 10{α}y — y plus one row [1|α] (the count diagonalizes to
+  // a single α-level marker, the supremum of count-limited iterations).
+  // Swallowing: applying level β on top of row level γ — β > γ pushes [k|β],
+  // β = γ adds to the top count, β < γ is swallowed (10{ω}10{ω+2}10 =
+  // 10{ω+2}10).  Counts are capped at MSI.
   // ---------------------------------------------------------------------------
 
   var COEFF_BOUND = 100; // cascade bound: larger coefficients supremum-collapse
@@ -2760,17 +2868,12 @@
 
   // ---------------------------------------------------------------------------
   // Compact "layer marker" values for levels at or above ω^ω (README L17).
-  // Such a level has no finite CNF coefficient row, so the result of x{α}y is
-  // stored as the diagonal value of the reduced level (one rule-3 step):
-  //   layer L >= 1, rows [count, a1, …, ap]  →
-  //     10{ ω^ω^…((L-1) ω^'s)…^( Σ_i ω^(ord_i)·count_i + Σ_j ω^j·r_j ) }10
-  //   with ord_i = ω^(p-1)·ap + … + ω·a2 + a1.
-  // Examples: 10{ω^y}10 = L1 [[0],[1,y]];  10{ω^ω}10 = L1 [[0],[1,0,1]];
-  //           10{ω^ω·y}10 = L1 [[0],[y,0,1]];  10{ω^(ω+y)}10 = L1 [[0],[1,y,1]];
-  //           10{ω^(ω·y)}10 = L2 [[0],[y,1]];  10{ω^(ω^y)}10 = L3 [[y]];
-  //           10{ω^ω^…^ω(y ω's)}10 = L_y [[0],[1,1]].
-  // A marker is always stored in STANDARD FORM (Q._standardizeLayerValue):
-  // finite-level rows merge into r0 and the layer drops as far as it can.
+  // layer L >= 1 with rows [count, a1..ap] (ord_i = ω^(p-1)·ap+…+a1) encodes
+  //   10{ ω^ω^…((L-1) ω^'s)…^( Σ_i ω^(ord_i)·count_i + Σ_j ω^j·r_j ) }10
+  // e.g. 10{ω^y}10 = L1 [[0],[1,y]];  10{ω^ω}10 = L1 [[0],[1,0,1]];
+  //      10{ω^ω·y}10 = L1 [[0],[y,0,1]];  10{ω^(ω·y)}10 = L2 [[0],[y,1]];
+  //      10{ω^(ω^y)}10 = L3 [[y]];  10{ω^ω^…^ω(y ω's)}10 = L_y [[0],[1,1]].
+  // Markers are stored in STANDARD FORM (Q._standardizeLayerValue).
   // ---------------------------------------------------------------------------
   Q._layerMarker = function (r0, layer, rows) {
     var v = new MetaNum(0);
@@ -2782,21 +2885,15 @@
     return Q._standardizeLayerValue(v);
   };
 
-  // Standard form of a layer >= 1 value (README L17).  Two rewrites, both
-  // preserving the encoded ordinal, applied until no longer possible:
-  //   (a) merge: an ordinal row [count, k] holds the finite level k, i.e. the
-  //       bracket term ω^k·count — the very term r0's own k-th entry spells
-  //       (Σ_j ω^j·r_j).  So whenever k < maxCols the row folds into r0:
-  //         cube(10,3): [[10],[1,3],[1,0,1]] → [[10,0,0,1],[1,0,1]].
-  //   (b) de-layer: a layer-L value whose bracket is the finite ω-polynomial β
-  //       (no row above ω survives) equals the layer-(L-1) value carrying the
-  //       single row [1|β] (bracket ω^β, one ω^ less above it):
-  //         layer2 [[5],[3,1]] → layer2 [[5,3]] → layer1 [[10],[1,5,3]]
-  //           = 10{ω^(ω*3+5)}10;
-  //         layer3 [[3]] → layer2 [[0,0,0,1]] → layer1 [[10],[1,0,0,0,1]]
-  //           = 10{ω^ω^3}10.
-  // Each de-layer step strictly lowers `layer`, so the loop terminates; the
-  // innermost base is written as 10 (the 10{…}10 diagonal marker).
+  // Standard form of a layer >= 1 value (README L17) — two ordinal-preserving
+  // rewrites, applied until neither fires:
+  //   (a) merge: a row [count, k] with finite k < maxCols folds into r0[k]
+  //       (cube(10,3): [[10],[1,3],[1,0,1]] → [[10,0,0,1],[1,0,1]]).
+  //   (b) de-layer: a bracket that is a finite ω-polynomial β (no row above ω)
+  //       equals the layer-(L-1) value with the single row [1|β] (layer2
+  //       [[5],[3,1]] → layer1 [[10],[1,5,3]] = 10{ω^(ω*3+5)}10).
+  // Each de-layer lowers `layer`, so the loop terminates; the innermost base
+  // is written as 10.
   function mergeFiniteRowsIntoR0(arr) {
     var r0 = arr[0];
     var keep = [];
@@ -2813,6 +2910,23 @@
     arr.length = 1;
     for (var j = 0; j < keep.length; j++) arr.push(keep[j]);
   }
+
+  // Layer marker WITHOUT the standard-form rewrites.  hardy's tower rule needs
+  // the layer to track the input's 10^ levels one-for-one — the standard
+  // de-layer ((b) above) would fold a finite-bracket marker (e.g. the
+  // layer-2 [[3086.036,9×8]] of eee10) down one layer and change the number
+  // the rule is about.  Same shape as _layerMarker, minus the rewrites.
+  Q._rawLayerMarker = function (r0, layer, rows) {
+    var v = new MetaNum(0);
+    v.sign = 1;
+    v.layer = layer > 0 ? layer : 0;
+    v.array = [(r0 && r0.length) ? r0.slice() : [0]];
+    for (var i = 0; i < (rows ? rows.length : 0); i++) {
+      if (rows[i] && rows[i].length > 1) v.array.push(rows[i].slice());
+    }
+    return v;
+  };
+
 
   Q._standardizeLayerValue = function (v) {
     if (!v || v.layer < 1) return v.normalize();
@@ -2860,6 +2974,8 @@
     if (x.eq(MetaNum.ONE)) return MetaNum.ONE.clone();
     if (y.eq(MetaNum.ONE)) return x.clone();
     if (cf.length === 0) return x.mul(y); // rule 1: x{0}y = x*y
+    // B2-a: base-2 infinite-level collapse (see _hyperopFromOrdinal).
+    if (x.eq(2) && y.isint() && y.gte(2) && coeffsHaveOmegaPart(cf)) return new MetaNum(4);
 
     if (!coeffsHaveOmegaPart(cf)) {
       // finite level: arrow() handles both small and huge operands
@@ -2895,12 +3011,16 @@
     var V = V0.clone();
     var i = 0;
     var guard = 0;
-    while (i < iters) {
-      if (++guard > 200) return Q._applyOrdinalRows(V, beta, iters - i);
+    // a fractional argument (yCnt - 1) still means a whole number of
+    // applications, and the rows must carry INTEGER counts — ceil keeps the
+    // step consistent with the expanded path (count = ceil(y)-2)
+    var total = Math.ceil(iters);
+    while (i < total) {
+      if (++guard > 200) return Q._applyOrdinalRows(V, beta, total - i);
       var vCnt = metaFiniteCount(V);
       if (!(vCnt <= MAX_SAFE_INTEGER)) {
         // V is huge: every further application adds one β-row → fast-forward
-        return Q._applyOrdinalRows(V, beta, iters - i);
+        return Q._applyOrdinalRows(V, beta, total - i);
       }
       V = Q._ordinalHyperop(x, V, beta, (depth || 0) + 1);
       i++;
@@ -2908,15 +3028,11 @@
     return V;
   };
 
-  // Helper: generic hyperoperation from ordinal level (Cantor normal form coefficients).
-  // coeffs: [c0, c1, c2, ..., ck] where ordinal = ω^k*ck + ... + ω^2*c2 + ω*c1 + c0
-  // Two computation paths:
-  //   - small operands (x ∈ [3, MSI] finite, y ∈ [3, MSI] finite, enumeration of
-  //     ordinals below α with coefficients < y fits into maxRows): legacy
-  //     enumeration representation (one row per ordinal below α, count = y-2)
-  //   - everything else (any operand beyond MSI, x = 2, or enumeration too large):
-  //     unified ordinal engine (README rules 1-4)
-  Q._hyperopFromOrdinalRaw = function (x, y, coeffs) {
+  // Helper: generic hyperoperation from ordinal level.  coeffs are the CNF
+  // coefficients [c0..ck] (ordinal = ω^k*ck+…+ω*c1+c0).  Two paths: small
+  // finite operands in [3, MSI] use the legacy enumeration (one row per ordinal
+  // below α, count = y-2); everything else the unified engine (rules 1-4).
+  Q._hyperopFromOrdinalRaw = function (x, y, coeffs, skipFrac) {
     x = new MetaNum(x);
     y = new MetaNum(y);
     if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
@@ -2924,8 +3040,31 @@
     if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
     if (x.eq(MetaNum.ONE)) return MetaNum.ONE.clone();
     if (y.eq(MetaNum.ONE)) return x.clone();
+
     var cf0 = trimCoeffs((coeffs || []).slice());
     if (cf0.length === 0) return x.mul(y); // rule 1: x{0}y = x*y
+    // B2-a: for base 2 every infinite level collapses (rule 3 turns the
+    // argument into 2; 2{...}2 = 2{2}2 = 4). Finite levels are excluded.
+    if (x.eq(2) && y.isint() && y.gte(2) && coeffsHaveOmegaPart(cf0)) return new MetaNum(4);
+    // Fractional level coefficients come from a fundamental sequence taken at a
+    // non-integer index.  On the diagonal ω = x, so ω^k·(c+f) = ω^k·c +
+    // ω^(k-1)·(x·f) — resolve top-down until only the constant term can still
+    // be fractional, then raise it to a fractional argument one level up:
+    // x{γ+f}x = x{γ+1}(2·(x/2)^f)  (10{ω*2}2.1 = 10{ω+3}2·5^0.1).
+    if (coeffsHaveFraction(cf0)) {
+      var xnf = x.toNumber();
+      if (isFinite(xnf) && xnf >= 2) {
+        var rs = Q._resolveFracLevel(cf0, xnf);
+        if (rs.frac > 0) {
+          var up = rs.ord.slice();
+          while (up.length < 1) up.push(0);
+          up[0] = (up[0] || 0) + 1;
+          var argF = 2 * Math.pow(xnf / 2, rs.frac);
+          return Q._hyperopFromOrdinal(x, new MetaNum(argF), trimCoeffs(up));
+        }
+        cf0 = rs.ord;
+      }
+    }
     // Non-integer argument at ordinal levels (issues.md addition 3):
     //   successor level α (c0 > 0):  x{α}(m+f) = x{α-1} applied m times to x^f
     //     (e.g. expa(10,2.1) = 10{ω+1}2.1 = 10{ω}10{ω}(10^0.1); continuous at
@@ -2944,13 +3083,31 @@
       // exactly and composition identities stay stable across paths
       var yf = new MetaNum(Number((yFracNum - ym).toPrecision(15)));
       if ((cf0[0] || 0) > 0) {
+        var xnfS = x.toNumber();
+        var xOkS = isFinite(xnfS) && xnfS >= 3 && xnfS <= MAX_SAFE_INTEGER;
+        // α-1 ≥ ω*2 only: for the ω+1/ω+2/ω+3 levels the applications after the
+        // first still have an operand inside MSI, so the engine evaluates them by
+        // the definition (10{ω}(10{ω}(10^0.1))) and that identity is exact.
+        var pred = succCoeffs(cf0);
+        var bigLevel = (pred[1] || 0) >= 2;
+        for (var bi = 2; bi < pred.length; bi++) if ((pred[bi] || 0) > 0) bigLevel = true;
+        if (xOkS && bigLevel && ym <= 100000) {
+          // Successor rule in the EXPANDED form (the generator the integer
+          // arguments use): the α-1 row carries the m applications as the
+          // integer count ceil(y)-2 = m-1, and the fraction lives in the cascade
+          // depth — the first FS starts at the fractional value x^f
+          // (x{α}(m+f) = x{α-1}^m(x^f), as 10{3}2.1 starts from 10^0.1).  Any
+          // leftover fraction lands in array[0][0].
+          return Q._expandedHyperop(x, new MetaNum(ym + 1), cf0,
+            Math.pow(xnfS, Number((yFracNum - ym).toPrecision(15))));
+        }
         if (ym <= 100000) {
           // successor rule: x{α}(m+f) = x{α-1} applied m times to x^f
           var succ = cf0.slice();
           succ[0] = succ[0] - 1;
           succ = trimCoeffs(succ);
           var v = x.pow(yf);
-          for (var it = 0; it < ym; it++) v = Q._hyperopFromOrdinalRaw(x, v, succ);
+          for (var it = 0; it < ym; it++) v = Q._hyperopFromOrdinalRaw(x, v, succ, true);
           return v;
         }
         // Successor level with an iteration count beyond direct evaluation:
@@ -2959,9 +3116,13 @@
         return Q._ordinalHyperop(x, y, cf0);
       }
       if (ym >= 1) {
-        // limit level: fundamental sequence at m = floor(y); rule 3 puts the
-        // base x as the final operand: x{λ}y = x{λ[m]}x
-        return Q._hyperopFromOrdinalRaw(x, x, fsCoeffs(cf0, ym));
+        // Limit level: rule 3 with the FULL (fractional) index — λ[y] can
+        // carry fractional coefficients (10{ω*2}2.1 = 10{ω+2.1}10), resolved by
+        // the fractional-level rule above, so the fraction is never dropped.
+        // Nested (skipFrac) the index is floored, else every application would
+        // take another fractional FS and recurse forever.
+        var fsIdx = skipFrac ? Math.floor(yFracNum) : yFracNum;
+        return Q._hyperopFromOrdinalRaw(x, x, fsCoeffs(cf0, fsIdx), skipFrac);
       }
     }
     var cf = cf0;
@@ -2970,9 +3131,11 @@
     if (deg >= 1 && x.array.length === 1 && x.layer === 0
         && y.array.length === 1 && y.layer === 0) {
       var xC = metaFiniteCount(x), yC = metaFiniteCount(y);
-      if (xC >= 3 && xC <= MAX_SAFE_INTEGER && yC >= 3 && yC <= MAX_SAFE_INTEGER
-          && Math.pow(yC, deg) <= MetaNum.maxRows) {
-        return Q._enumHyperop(x, y, cf);
+      // Finite operands in [3, MSI] always take the EXPANDED cascade form — a
+      // limit operation keeps its fundamental-sequence rows all the way up to
+      // MSI (100 < y ≤ MSI included), truncated to the largest maxRows-1 rows.
+      if (xC >= 3 && xC <= MAX_SAFE_INTEGER && yC >= 3 && yC <= MAX_SAFE_INTEGER) {
+        return Q._expandedHyperop(x, y, cf);
       }
     }
     return Q._ordinalHyperop(x, y, cf);
@@ -2992,214 +3155,162 @@
     return r;
   };
 
-  // Legacy (HEAD-compatible) enumeration-based hyperoperation for small operands.
-  Q._enumHyperop = function (x, y, coeffs) {
-    var xNum = x.toNumber();
-    var yNum = y.toNumber();
-    var maxRows = MetaNum.maxRows; // 100
-    var baseArrowLevel = Math.max(Math.floor(isFinite(xNum) ? xNum : 3), 3);
-    var baseResult = x.arrow(baseArrowLevel)(x);
-    var rows = Q._generateOrdinalRows(coeffs,
-      isFinite(xNum) ? Math.floor(xNum) : baseArrowLevel,
-      isFinite(yNum) ? Math.floor(yNum) : baseArrowLevel,
-      maxRows);
+  // ---------------------------------------------------------------------------
+  // Expanded (cascade) form of x{α}y for FINITE operands in [3, MSI] — README
+  // rules 1-4 row by row.  Rows are generated TOP-DOWN (a huge fundamental
+  // sequence costs nothing; the budget keeps the LARGEST rows):
+  //   successor α = β+m:  x{α}y = x{β+m-1}^(y-2)(x{β+m-1}x) — only the top row
+  //     follows y, every row below carries x-2 (h13(10,20) → [8,0,1],[8,1,1],[18,2,1]).
+  //   limit α:  rule 3 turns the operand into the base x, so every row carries x-2.
+  // Only array[0][0] may be non-integer (same contract as arrow()); a fractional
+  // argument enters as the outer count ceil(y)-2, the fractional start value x^f
+  // of the first fundamental sequence (`fsOpd`), or a leftover constant term
+  // carried into the base's finite level index (`.baseIdx`).
+  // ---------------------------------------------------------------------------
+  Q._cascadeRows = function (xn, cf, yn, budget, fsOpd) {
+    var rows = [];
+    if (!(budget >= 1)) return rows;
+    var cfs = trimCoeffs((cf || []).slice());
+    var opd = Math.min(yn, MAX_SAFE_INTEGER);
+    var first = (cfs[0] || 0) > 0;      // successor: the outer count is y-2
+    var fracOpd = (fsOpd === undefined) ? null : fsOpd;
+    var baseIdx = xn;
+    var fracRem = 0;                    // fractional constant carried to the base
+    var guard = 0;
+    while (rows.length < budget && guard++ < 10000) {
+      if (!coeffsHaveOmegaPart(cfs)) break;             // finite level: no row
+      if ((cfs[0] || 0) > 0) {
+        var mRaw = cfs[0];
+        var m = Math.floor(mRaw);
+        // a fractional constant term is not a valid CNF coefficient: keep the
+        // integer part as rows and carry the remainder to the base
+        var mFr = Number((mRaw - m).toPrecision(15));
+        if (mFr > 1e-9) fracRem = mFr;
+        var beta = trimCoeffs(cfs.slice());
+        beta[0] = 0;
+        beta = trimCoeffs(beta);
+        var steps = Math.min(m, budget - rows.length + 1);
+        for (var s = 0; s < steps; s++) {
+          var j = m - 1 - s;                            // rows β+m-1 … β
+          var cnt = (first ? opd : xn) - 2;
+          first = false;
+          if (cnt < 1) continue;                        // no application to record
+          if (cnt > MAX_SAFE_INTEGER) cnt = MAX_SAFE_INTEGER;
+          var ord = beta.slice();
+          if (j > 0) ord[0] = (ord[0] || 0) + j;        // β + j
+          ord = trimCoeffs(ord);
+          if (!coeffsHaveOmegaPart(ord)) continue;      // finite: lives in r0
+          var row = [snapInt(cnt)];
+          for (var oi = 0; oi < ord.length; oi++) row.push(snapInt(ord[oi]));
+          rows.push(row);
+        }
+        cfs = beta;                                     // continue below β
+        opd = Math.min(xn, MAX_SAFE_INTEGER);           // everything below the top
+        continue;                                       // row is base-operand
+      }
+      // limit: fundamental sequence at the current operand (rule 3)
+      var idx = (fracOpd !== null) ? fracOpd : opd;
+      fracOpd = null;
+      baseIdx = idx;
+      var nxt = fsCoeffs(cfs, idx);
+      if (coeffsHaveFraction(nxt)) {
+        // a fractional index makes the coefficients fractional (ω^k·(c+f)) —
+        // resolve them against the base so every row coefficient stays an
+        // integer, carrying the leftover constant fraction into the base
+        var rs2 = Q._resolveFracLevel(nxt, xn);
+        cfs = rs2.ord;
+        if (rs2.frac > 0) fracRem = rs2.frac;
+      } else {
+        cfs = trimCoeffs(nxt);
+      }
+      opd = Math.min(xn, MAX_SAFE_INTEGER);             // operand becomes x
+    }
+    rows.baseIdx = baseIdx + fracRem;                   // descending by ordinal
+    return rows;
+  };
+
+  Q._expandedHyperop = function (x, y, cf, fsOpd) {
+    var maxRows = MetaNum.maxRows;
+    var xn = Math.floor(metaFiniteCount(x));
+    // ceil: the outer count must stay an integer (only array[0][0] may be
+    // fractional), so the m applications of x{α}(m+f) give ceil(y)-2 = m-1
+    var yn = Math.ceil(metaFiniteCount(y));
+    var budget = maxRows - 1;                           // ordinal rows the array holds
+    var desc = Q._cascadeRows(xn, cf, yn, budget + 1, fsOpd); // +1 detects truncation
+    var truncated = desc.length > budget;
+    if (truncated) desc = desc.slice(0, budget);   // keep the LARGEST rows
+    var rows = desc.reverse();                          // ascending
+    // base r0 = x{idx}x (rule 3 at the ω level: x{ω}x = x{x}x) — the finite part;
+    // idx is the operand of the descent that bottoms out, i.e. the fractional
+    // start value x^f when the cascade came from the fractional successor rule
+    var baseIdx = (desc.baseIdx === undefined) ? xn : desc.baseIdx;
+    // arrow() evaluates fractional levels too (10{10.2589}10 ≠ 10{10}10), so the
+    // carried fraction survives into the base
+    var baseResult = x.arrow(Math.max(baseIdx, 3))(x);
     var result = baseResult.clone();
-    var maxOrdinalRows = maxRows - 1;
-    if (rows.length > maxOrdinalRows) {
-      // Truncation: keep the largest maxOrdinalRows rows (rows ascend), the
-      // base defaults to [10] and the first kept row's count marks it with +1
-      rows = rows.slice(rows.length - maxOrdinalRows);
+    if (truncated) {
       result.array = [[10]];
-      rows[0][0] = (rows[0][0] || 0) + 1;
+      rows[0][0] = (rows[0][0] || 0) + 1;               // truncation marker
       if (rows[0][0] > MAX_SAFE_INTEGER) rows[0][0] = MAX_SAFE_INTEGER;
     } else {
       result.array = [baseResult.array[0].slice()];
     }
     for (var i = 0; i < rows.length; i++) result.array.push(rows[i]);
-    if (result.array.length > 1) result.layer = 0;
-    return result;
+    result.layer = 0;
+    return result.normalize();
   };
 
-  // Legacy (HEAD-compatible) ordinal row enumeration: one row per ordinal below
-  // `coeffs` (coefficients bounded by `cardinal`), each with count = cardinal-2.
-  Q._generateOrdinalRows = function (coeffs, base, cardinal, maxRows) {
-    var rows = [];
-    var m = base;
-    var n = cardinal;
+  // Floating-point residue: 2.1e-12 left where the exact value is an integer.
+  // Only array[0][0] may be fractional, so snap everything else.
+  function snapInt(v) {
+    if (!isFinite(v)) return v;
+    var r = Math.round(v);
+    return Math.abs(v - r) < 1e-9 ? r : v;
+  }
 
-    function compareOrd(a, b) {
-      var maxLen = Math.max(a.length, b.length);
-      for (var i = maxLen - 1; i >= 0; i--) {
-        var va = (i < a.length) ? (a[i] || 0) : 0;
-        var vb = (i < b.length) ? (b[i] || 0) : 0;
-        if (va < vb) return -1;
-        if (va > vb) return 1;
+  // Does any entry outside array[0][0] carry a fractional part?
+  function hasFractionOutsideR00(v) {
+    if (!v || !v.array) return false;
+    for (var i = 0; i < v.array.length; i++) {
+      var row = v.array[i];
+      for (var j = 0; j < row.length; j++) {
+        if (i === 0 && j === 0) continue;
+        var c = row[j];
+        if (typeof c === "number" && isFinite(c) && c !== Math.floor(c)) return true;
       }
-      return 0;
     }
+    return false;
+  }
 
-    function addOrd(a, b) {
-      if (!b || b.length === 0 || (b.length === 1 && b[0] === 0)) return a.slice();
-      if (!a || a.length === 0 || (a.length === 1 && a[0] === 0)) return b.slice();
-      var result = a.slice();
-      var k = 0;
-      while (k < result.length && (result[k] || 0) === 0) k++;
-      if (k >= result.length) {
-        return b.slice();
-      } else if (k === 0) {
-        result[0] = (result[0] || 0) + (b[0] || 0);
-        for (var i = 1; i < b.length; i++) {
-          result[i] = (result[i] || 0) + (b[i] || 0);
-        }
-      } else {
-        result[k] = 0;
-        result = result.slice(0, k);
-        for (var i = 0; i < b.length; i++) {
-          result.push(b[i] || 0);
-        }
+  // Any coefficient with a non-zero fractional part?
+  function coeffsHaveFraction(coeffs) {
+    for (var i = 0; i < coeffs.length; i++) {
+      var c = coeffs[i] || 0;
+      if (c !== Math.floor(c)) return true;
+    }
+    return false;
+  }
+
+  // Resolve fractional CNF coefficients against the base x (see the comment in
+  // _hyperopFromOrdinalRaw): ω^(k)·(c+f) = ω^(k)·c + ω^(k-1)·(x·f) top-down.
+  // Returns the integer level plus the fractional part left in the constant term.
+  Q._resolveFracLevel = function (cf, xn) {
+    var r = trimCoeffs((cf || []).slice());
+    for (var k = r.length - 1; k >= 1; k--) {
+      var c = r[k] || 0;
+      var fl = Math.floor(c);
+      var fr = Number((c - fl).toPrecision(15));
+      if (fr > 1e-9) {
+        r[k] = fl;
+        r[k - 1] = (r[k - 1] || 0) + xn * fr;
       }
-      while (result.length > 0 && result[result.length - 1] === 0) result.pop();
-      return result;
     }
-
-    function isZero(ord) {
-      if (!ord || ord.length === 0) return true;
-      for (var i = 0; i < ord.length; i++) {
-        if ((ord[i] || 0) !== 0) return false;
-      }
-      return true;
-    }
-
-    function buildRow(ord, count) {
-      var maxIdx = ord.length - 1;
-      while (maxIdx >= 0 && (ord[maxIdx] || 0) === 0) maxIdx--;
-      if (maxIdx < 0) return null;
-      var row = [count];
-      for (var i = 0; i <= maxIdx - 1; i++) row.push(ord[i] || 0);
-      row.push(ord[maxIdx]);
-      return row;
-    }
-
-    // Enumerate all ordinals below ω^k with coefficients < n
-    function enumBelowOmegaK(k, n) {
-      if (k === 0) {
-        return [[0]];
-      }
-      if (k === 1) {
-        var result = [];
-        for (var i = 0; i < n; i++) {
-          result.push([i]);
-        }
-        return result;
-      }
-      var result = [];
-      for (var a = 0; a < n; a++) {
-        var sub = enumBelowOmegaK(k - 1, n);
-        for (var i = 0; i < sub.length; i++) {
-          var combined = sub[i].slice();
-          while (combined.length < k) combined.push(0);
-          combined[k - 1] = a;
-          result.push(combined);
-        }
-      }
-      return result;
-    }
-
-    // Enumerate all ordinals below a given ordinal
-    function enumBelow(alpha, n) {
-      if (isZero(alpha)) return [];
-
-      if ((alpha[0] || 0) > 0) {
-        var pred = alpha.slice();
-        pred[0]--;
-        while (pred.length > 0 && pred[pred.length - 1] === 0) pred.pop();
-        if (pred.length === 0) pred = [0];
-        var result = enumBelow(pred, n);
-        result.push(pred.slice());
-        return result;
-      }
-
-      var k = alpha.length - 1;
-      while (k >= 0 && (alpha[k] || 0) === 0) k--;
-      if (k < 0) return [];
-
-      var ck = alpha[k] || 0;
-      var rest = alpha.slice(0, k);
-      while (rest.length > 0 && rest[rest.length - 1] === 0) rest.pop();
-
-      var result = [];
-
-      for (var j = 0; j < ck; j++) {
-        var sub = enumBelowOmegaK(k, n);
-        for (var i = 0; i < sub.length; i++) {
-          var combined = sub[i].slice();
-          while (combined.length <= k) combined.push(0);
-          combined[k] = j;
-          result.push(combined);
-        }
-      }
-
-      if (!isZero(rest)) {
-        var restSub = enumBelow(rest, n);
-        for (var i = 0; i < restSub.length; i++) {
-          var combined = restSub[i].slice();
-          while (combined.length <= k) combined.push(0);
-          combined[k] = ck;
-          result.push(combined);
-        }
-      }
-
-      return result;
-    }
-
-    var count = n - 2;
-    if (count < 1) return rows;
-
-    var allOrdinals = enumBelow(coeffs, n);
-
-    var seen = {};
-    var uniqueOrdinals = [];
-    for (var i = 0; i < allOrdinals.length; i++) {
-      var ord = allOrdinals[i];
-      if (isZero(ord)) continue;
-
-      // Normalize: remove trailing zeros
-      var normalized = ord.slice();
-      while (normalized.length > 0 && normalized[normalized.length - 1] === 0) {
-        normalized.pop();
-      }
-
-      // Skip ordinals below ω (finite ordinals: only constant term, length <= 1)
-      if (normalized.length <= 1) continue;
-
-      var key = normalized.join(',');
-      if (seen[key]) continue;
-      seen[key] = true;
-      uniqueOrdinals.push(normalized);
-    }
-
-    uniqueOrdinals.sort(function (a, b) {
-      return compareOrd(a, b);
-    });
-
-    var allRows = [];
-    for (var i = 0; i < uniqueOrdinals.length; i++) {
-      var row = buildRow(uniqueOrdinals[i], count);
-      if (row) allRows.push(row);
-    }
-
-    // When enumerating more rows than fit, keep the largest maxRows-1
-    // ordinals (rows are sorted ascending, so drop from the front)
-    if (allRows.length > maxRows - 1) {
-      var maxOrdinalRows = maxRows - 1;
-      allRows = allRows.slice(allRows.length - maxOrdinalRows);
-    }
-
-    for (var i = 0; i < allRows.length; i++) {
-      rows.push(allRows[i]);
-    }
-
-    return rows;
+    var c0 = r[0] || 0;
+    var fl0 = Math.floor(c0);
+    var fr0 = Number((c0 - fl0).toPrecision(15));
+    if (!(fr0 > 1e-9)) fr0 = 0;
+    r[0] = fl0;
+    return { ord: trimCoeffs(r), frac: fr0 };
   };
 
   // Helper: number of leading iterate applications (of level `beta`) starting
@@ -3216,6 +3327,26 @@
     }
     return steps + 1;
   }
+
+  // Inverse of a LIMIT level taken through the expanded cascade: x{λ}y = x{λ[y]}x
+  // makes every row depend on y only through the fundamental sequence, so instead
+  // of reading a count row we search the (monotone) forward map.
+  Q._invExpandedLimit = function (base, value, coeffs) {
+    var lo = 3, hi = MAX_SAFE_INTEGER, best = 0;
+    var v3 = Q._expandedHyperop(base, new MetaNum(3), coeffs);
+    if (value.lt(v3)) return base.clone();
+    while (lo <= hi) {
+      var mid = lo + Math.floor((hi - lo) / 2);
+      if (Q._expandedHyperop(base, new MetaNum(mid), coeffs).lte(value)) {
+        best = mid; lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    if (best === 0) return base.clone();
+    var vb = Q._expandedHyperop(base, new MetaNum(best), coeffs);
+    return vb.eq(value) ? new MetaNum(best) : base.clone();
+  };
 
   // Helper: generic inverse hyperoperation from ordinal level.
   // Forward paths and the rows they leave:
@@ -3249,14 +3380,29 @@
     }
     if (cf.length === 0) return z;
 
-    // enumeration path (base z is a small finite number ≥ 3): top row count = y-2
+    // expanded cascade path (base z is a small finite number ≥ 3): the forward
+    // operation wrote the rule-1..4 cascade rows.
+    //   successor α: the row at α-1 carries exactly y-2 applications → +2
+    //   limit α: every row carries x-2 and y only appears inside the
+    //     fundamental-sequence rows, so it is recovered from the forward map
     var zC = metaFiniteCount(z);
     if (z.array.length === 1 && z.layer === 0 && zC >= 3 && zC <= MAX_SAFE_INTEGER) {
-      var lastRow = x.array[x.array.length - 1];
-      if (lastRow && lastRow.length >= 2 && (lastRow[0] || 0) > 0) {
-        return new MetaNum((lastRow[0] || 0) + 2);
+      if ((cf[0] || 0) > 0) {
+        var pred = succCoeffs(cf);
+        var predRow = null;
+        for (var pi = x.array.length - 1; pi >= 1; pi--) {
+          var prow = x.array[pi];
+          if (prow && prow.length >= 2 && (prow[0] || 0) > 0 &&
+              cmpCoeffsLevel(rowToCoeffs(prow), pred) === 0) { predRow = prow; break; }
+        }
+        if (predRow) return new MetaNum((predRow[0] || 0) + 2);
+        var lastRow = x.array[x.array.length - 1];
+        if (lastRow && lastRow.length >= 2 && (lastRow[0] || 0) > 0) {
+          return new MetaNum((lastRow[0] || 0) + 2);
+        }
+        return z;
       }
-      return z;
+      return Q._invExpandedLimit(z, x, cf);
     }
 
     // engine path: count row [c | β] with β = α-1 (successor α only)
@@ -3595,25 +3741,27 @@
   // ---------------------------------------------------------------------------
 
   // ---------------------------------------------------------------------------
-  // Hyperoperations from ω^ω up to ε₀ — README rules 1-4 with the unified
-  // limit rule n{λ}b = n{λ[b]}n (the final operand is the BASE n, never b).
-  // Levels ≥ ω^ω have no finite CNF coefficient row, so — except where the
-  // reduced level λ[y] still fits a layer-0 ordinal row — the result is stored
-  // as the compact layer marker of λ[y] (see Q._layerMarker).
+  // Hyperoperations from ω^ω up to ε₀ — README rules 1-4 with the unified limit
+  // rule n{λ}b = n{λ[b]}n (the final operand is the BASE n).  Levels ≥ ω^ω have
+  // no finite CNF row, so — unless λ[y] still fits a layer-0 row — the result
+  // is the compact layer marker of λ[y] (Q._layerMarker).
   // ---------------------------------------------------------------------------
 
-  // iter (ω^ω): (ω^ω)[y] = ω^y  →  x{ω^ω}y = x{ω^y}x
-  // e.g. iter(3,5) = 3{ω^5}3 = 3{ω^4*3}3 = … = 3{ω^4*2+ω^3*2+ω^2*2+ω*2+2}3…
-  //   (whole fundamental-sequence cascade → layer 0 multi-row array)
-  // for y >= maxCols the ω^y row no longer fits → layer=1 marker [[r0],[1,y]]
-  //   (= 10{ω^y}10), and for y > MSI the operand is unrepresentable → the
-  //   ω^ω marker row [1,0,1] (= 10{ω^ω}10).
+  // iter (ω^ω): (ω^ω)[y] = ω^y  →  x{ω^ω}y = x{ω^y}x — the whole
+  // fundamental-sequence cascade as a layer-0 multi-row array.  For y >=
+  // maxCols the ω^y row no longer fits → layer-1 marker [[r0],[1,y]]
+  // (= 10{ω^y}10); for y > MSI → the ω^ω marker row [1,0,1].
   P.iterate = P.iter = P.hww = function (y) {
     var x = this.clone();
     y = new MetaNum(y);
     if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
     if (x.eq(MetaNum.ONE)) return MetaNum.ONE.clone();
     if (y.eq(MetaNum.ONE)) return x.clone();
+    // rule 3 collapses x{λ}y to x{λ[y]}x; for x=2 the argument becomes 2 and
+    // every further FS/successor step keeps it there, so the cascade ends at
+    // 2{...}2 = 2{2}2 = 4 for ANY limit/successor level λ and integer y >= 2
+    // (issue #17 D07/B2-a). Finite levels are excluded (2{1}3 = 8).
+    if (x.eq(2) && y.isint() && y.gte(2)) return new MetaNum(4);
     if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
 
     // iterate(x,y) = x{ω^ω}y. Rule 3 with the fundamental sequence
@@ -3636,8 +3784,32 @@
       return Q._layerMarker([10], 1, [[1, m]]);
     }
     if (yc <= MAX_SAFE_INTEGER) {
-      // fractional y: rule 3 takes the fundamental sequence at floor(y)
-      return P.iterate.call(x, new MetaNum(Math.max(2, Math.floor(yc))));
+      // fractional y: (ω^ω)[y] = ω^y = ω^(m+f) = ω^m·ω^f, and on the diagonal
+      // ω^f reads as x^f — so the level is ω^m·(x^f), whose coefficients carry
+      // x^f at index m (README: 10{ω^ω}2.1 = 10{ω^2.1}10 = 10{ω^2*10^0.1}10).
+      // Flooring y would lose the fraction and make iterate(10,2.1)=iterate(10,2).
+      var mf = Math.max(2, Math.floor(yc));
+      var ff = Number((yc - Math.floor(yc)).toPrecision(15));
+      var xnf = x.toNumber();
+      var cfac = (isFinite(xnf) && xnf >= 2 && ff > 0) ? Math.pow(xnf, ff) : 1;
+      if (mf < MetaNum.maxCols) {
+        var cfw = [];
+        for (var cw = 0; cw < mf; cw++) cfw.push(0);
+        cfw.push(cfac);
+        return Q._hyperopFromOrdinal(x, x, cfw);
+      }
+      // marker form: ω^m·(x^f) — the count must stay an integer, so write the
+      // fractional part out one level down: ω^m·floor(c) + ω^(m-1)·(x·frac),
+      // the same resolution the CNF levels use
+      if (mf >= MetaNum.maxCols) {
+        var cfFl = Math.floor(cfac), cfFr = cfac - cfFl;
+        var mkRows = [];
+        if (cfFl >= 1) mkRows.push([cfFl, mf]);
+        if (cfFr > 1e-9 && mf >= 2) mkRows.push([Math.max(1, Math.round(xnf * cfFr)), mf - 1]);
+        if (mkRows.length === 0) mkRows.push([1, mf]);
+        return Q._layerMarker([10], 1, mkRows);
+      }
+      return Q._layerMarker([10], 1, [[cfac, mf]]);
     }
     // ordinal / out-of-range operand: y plus one ω^ω marker row
     return Q._ordinalOperandOp(y, 1, [1, 0, 1]);
@@ -3700,18 +3872,17 @@
   };
 
   // itermult (ω^ω+1): successor level — x{ω^ω+1}y = x{ω^ω} applied y-1 times
-  // to x (rule 2), i.e. itmu(3,k) = 3{ω^ω}3{ω^ω}…3 with k 3's.
-  //   k = 2 → x{ω^ω}x = iterate(x,x) exactly; 1 < k < 2 → x{ω^ω}(x^(k-1)).
-  //   k > 2 → layer=1 marker [[k-1],[1,0,1]] = 10{ω^ω+(k-1)}10: any finite
-  //     number of ω^ω applications stays strictly below ω^ω·2, so the count
-  //     lives in the constant term (ω^ω + n) — monotone in k and still below
-  //     cuboiter's ω^ω+ω^k.
+  // to x (rule 2).  k = 2 → iterate(x,x) exactly; 1 < k < 2 → x{ω^ω}(x^(k-1)).
+  // k > 2 → layer-1 marker [[k-1],[1,0,1]] = 10{ω^ω+(k-1)}10: finitely many
+  // ω^ω applications stay below ω^ω·2, so the count lives in the constant term
+  // (monotone in k, still below cuboiter's ω^ω+ω^k).
   P.itermult = P.itmu = P.hw01 = function (y) {
     var x = this.clone();
     y = new MetaNum(y);
     if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
     if (x.eq(MetaNum.ONE)) return MetaNum.ONE.clone();
     if (y.eq(MetaNum.ONE)) return x.clone();
+    if (x.eq(2) && y.isint() && y.gte(2)) return new MetaNum(4);
     if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
     var yc = metaFiniteCount(y);
     if (yc <= MAX_SAFE_INTEGER) {
@@ -3777,6 +3948,7 @@
     if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
     if (x.eq(MetaNum.ONE)) return MetaNum.ONE.clone();
     if (y.eq(MetaNum.ONE)) return x.clone();
+    if (x.eq(2) && y.isint() && y.gte(2)) return new MetaNum(4);
     if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
     var yc = metaFiniteCount(y);
     if (yc <= MAX_SAFE_INTEGER) {
@@ -3838,6 +4010,7 @@
     if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
     if (x.eq(MetaNum.ONE)) return MetaNum.ONE.clone();
     if (y.eq(MetaNum.ONE)) return x.clone();
+    if (x.eq(2) && y.isint() && y.gte(2)) return new MetaNum(4);
     if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
     var yc = metaFiniteCount(y);
     if (yc <= MAX_SAFE_INTEGER) {
@@ -3892,6 +4065,7 @@
     if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
     if (x.eq(MetaNum.ONE)) return MetaNum.ONE.clone();
     if (y.eq(MetaNum.ONE)) return x.clone();
+    if (x.eq(2) && y.isint() && y.gte(2)) return new MetaNum(4);
     if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
     var yc = metaFiniteCount(y);
     if (yc <= MAX_SAFE_INTEGER) {
@@ -3946,6 +4120,7 @@
     if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
     if (x.eq(MetaNum.ONE)) return MetaNum.ONE.clone();
     if (y.eq(MetaNum.ONE)) return x.clone();
+    if (x.eq(2) && y.isint() && y.gte(2)) return new MetaNum(4);
     if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
     var yc = metaFiniteCount(y);
     if (yc <= MAX_SAFE_INTEGER) {
@@ -4007,6 +4182,7 @@
     if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
     if (x.eq(MetaNum.ONE)) return MetaNum.ONE.clone();
     if (y.eq(MetaNum.ONE)) return x.clone();
+    if (x.eq(2) && y.isint() && y.gte(2)) return new MetaNum(4);
     if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
     var yc = metaFiniteCount(y);
     if (yc <= MAX_SAFE_INTEGER) {
@@ -4080,6 +4256,7 @@
     if (x.isNaN() || y.isNaN()) return MetaNum.NaN.clone();
     if (x.eq(MetaNum.ONE)) return MetaNum.ONE.clone();
     if (y.eq(MetaNum.ONE)) return x.clone();
+    if (x.eq(2) && y.isint() && y.gte(2)) return new MetaNum(4);
     if (y.lte(MetaNum.ZERO)) return MetaNum.NaN.clone();
     // ε₀[2] = ω^ω, so epsilonate(x,2) = x{ω^ω}x = iterate(x,x) exactly (the
     // same value itermult(x,2) produces — x{ε₀}2 = x{ω^ω+1}2).
@@ -4088,7 +4265,13 @@
     if (yc <= MAX_SAFE_INTEGER) {
       var m = Math.max(2, Math.floor(yc));
       if (m > MAX_SAFE_INTEGER) m = MAX_SAFE_INTEGER;
-      return Q._layerMarker([10], m, [[1, 1]]);
+      // v2.0.2: a fractional height (hardy of anything between 10^^m and
+      // 10^^(m+1)) interpolates through the base argument 10+f instead of being
+      // flat across the whole range — and only array[0][0] stays fractional
+      var marker = Q._layerMarker([10], m, [[1, 1]]);
+      var mf = Number((yc - Math.floor(yc)).toPrecision(15));
+      if (isFinite(mf) && mf > 0) marker.array[0][0] = 10 + mf;  // stays in array[0][0]
+      return marker;
     }
     // ordinal / out-of-range operand: ε₀ caps the library → the MSI ω-tower
     return Q._layerMarker([10], MAX_SAFE_INTEGER, [[1, 1]]);
@@ -4438,9 +4621,22 @@
           }
           // Always include layer symbol for layers 1-10
           if (this.layer >= 1 && finOps === "" && baseStr !== "") {
-            return sym + ordTokens.join("") + baseStr;
+            // "^count" tokens are space-separated (see the layer-0 path)
+            var hasPowS = false;
+            for (var ps = 0; ps < ordTokens.length; ps++) {
+              if (ordTokens[ps].indexOf("^") !== -1) { hasPowS = true; break; }
+            }
+            return sym + ordTokens.join(hasPowS ? " " : "") + (hasPowS ? " " : "") + baseStr;
           }
-          return sym + ordTokens.join("") + (finOps ? finOps : "") + baseStr;
+          // "^count" tokens are space-separated so the parser can split the
+          // count from the trailing base digits (see the layer-0 path).
+          var hasPowL = false;
+          for (var pl = 0; pl < ordTokens.length; pl++) {
+            if (ordTokens[pl].indexOf("^") !== -1) { hasPowL = true; break; }
+          }
+          var bodyL = ordTokens.join(hasPowL ? " " : "");
+          if (hasPowL && (finOps || baseStr)) bodyL += " ";
+          return sym + bodyL + (finOps ? finOps : "") + baseStr;
         }
       }
       
@@ -4598,7 +4794,16 @@
         var hasAa = finOps && finOps.indexOf("Aa") !== -1;
         var prefix = useExclaim ? "!" : "";
         var baseNum = (useExclaim || hasAa) ? "" : decimalPlaces(this.array[0][0], 6);
-        return prefix + ordTokens.join("") + (finOps ? finOps : "") + baseNum;
+        // Tokens carrying an explicit "^count" are space-separated (same rule
+        // as formatFiniteOps) so the parser can tell the count from the
+        // trailing base digits: "Ijj^8 Iji^8 … Iib^8 10", not "Iib^810".
+        var hasPow = false;
+        for (var pi = 0; pi < ordTokens.length; pi++) {
+          if (ordTokens[pi].indexOf("^") !== -1) { hasPow = true; break; }
+        }
+        var body = ordTokens.join(hasPow ? " " : "");
+        if (hasPow && (finOps || baseNum)) body += " ";
+        return prefix + body + (finOps ? finOps : "") + baseNum;
       }
     }
 
@@ -4633,7 +4838,7 @@
     if (this.isNaN()) return "NaN";
     if (this.isInfinite()) return "Infinity";
     if (isSimple(this)) {
-      var v = decimalPlaces(this.array[0][0], places);
+      var v = decimalPlaces(magnitudeOf(this), places);   // sub-unit r0 = reciprocal
       if (Number.isFinite(v)) return v.toString();
     }
     return this.toString();
@@ -4649,7 +4854,14 @@
     if (typeof require == 'function') {
       try { formatter = require('./format-metanum.js').format; } catch (e) { formatter = null; }
     }
-    return format(this, precision, small);
+    if (!formatter && typeof format === 'function') formatter = format;   // browser bundle
+    if (!formatter) {
+      // No formatter available (bare browser include): fall back to the plain
+      // decimal expansion rather than throwing ReferenceError.
+      var plain = this.toNumber();
+      return isFinite(plain) ? String(plain) : this.toString();
+    }
+    return formatter(this, precision, small);
   };
 
   P.toExponential = function (places) {
@@ -4681,16 +4893,37 @@
     if (this.isNaN()) return "NaN";
     if (this.isInfinite()) return "Infinity";
     if (isSimple(this)) {
-      var v = this.array[0][0];
+      var v = magnitudeOf(this);   // sub-unit r0 holds the reciprocal
       if (v < 10) return String(v);
-      return "E" + Math.log10(v).toFixed(6);
+      // Ea means 10^a; drop the toFixed tail so E15 is not "E15.000000".
+      return "E" + String(Number(Math.log10(v).toFixed(6)));
     }
-    if (this.layer > 0) return "E" + this.layer + "#" + this.toString();
+    // Hyper-E has no faithful compact form for ordinal rows / ε layers; keep
+    // the exact MetaNum spelling instead of emitting a bogus E…#… chain.
+    if (this.layer > 0) return this.toString();
     if (this.array.length === 1 && this.array[0].length >= 2) {
-      var s = "E";
-      for (var i = 1; i < this.array[0].length; i++) s += "#";
-      s += String(this.array[0][0]);
-      return s;
+      var row = this.array[0];
+      var a = row[0];
+      var k = row[1];
+      // A pure 10^ tower [a, k] (all higher entries are zero) is Ea#k.
+      // Canonicalise integer-height tetration to E1#n (10^^n), which is
+      // both shorter and round-trippable: 10^^16 = E1#16.
+      if (row.length === 2 && isFinite(k) && k === Math.floor(k) && k >= 1) {
+        var sl = this.slog();
+        if (sl.layer === 0 && sl.array.length === 1 &&
+            sl.array[0].length === 1) {
+          var n = sl.toNumber();
+          if (isFinite(n) && n === Math.floor(n) && n >= 1) {
+            return "E1#" + String(n);
+          }
+        }
+        // short towers stay in the ordinary E-prefix form (E16, EE16, …);
+        // longer ones use the compact argument form Ea#k.
+        if (k <= 4) return "E".repeat(k) + String(a);
+        return "E" + String(a) + "#" + String(k);
+      }
+      // rows with 10^^ / higher levels: no compact faithful form yet
+      return this.toString();
     }
     return this.toString();
   };
@@ -4846,6 +5079,10 @@
       x.sign = negateIt ? -1 : 1;
       return x;
     }
+    // Ea#b / E1#n (Hyper-E argument form) goes through the fromString path.
+    if (s.indexOf('#') >= 0) {
+      return MetaNum.fromString((negateIt ? "-" : "") + s);
+    }
     var count = 0;
     while (s[0] === "E") {
       count++;
@@ -4885,6 +5122,10 @@
     x.layer = 0;
 
     var s = input.trim();
+    // Displays group digits with commas ("29,657", "1,000,000") — strip them
+    // so every format() output parses back (digit-comma-digit only, so BEAF
+    // strings like "{10, 16}" and JSON payloads are untouched).
+    s = s.replace(/(\d),(?=\d)/g, "$1");
     if (s === "" || s === "0") {
       return x;
     }
@@ -4905,6 +5146,33 @@
       x.array = [[Infinity]];
       x.sign = negateIt ? -1 : 1;
       return x;
+    }
+
+    // Hyper-E argument form: Ea#b = b applications of 10^ to a
+    // (E16 = 10^16, E100#2 = 10^10^100, E1#16 = 10^^16).
+    var hMatch = s.match(/^E([0-9]+(?:\.[0-9]+)?)#([0-9]+)$/);
+    if (hMatch) {
+      x.array = [[Number(hMatch[1]), Number(hMatch[2])]];
+      x.sign = negateIt ? -1 : 1;
+      return x.normalize();
+    }
+
+    // v2.0.2: "1e10+0.5" / "1e10+11" / "1e16+1e13" — the digit paths (hardy)
+    // need the exact decimal value and the plain float parse reads 0 here.
+    // Split the sum and add the parts exactly; the '+' must not be the e+
+    // exponent marker ("1e+21" keeps its old parsing).
+    if (s.indexOf('+') > 0) {
+      var sumParts = s.split('+');
+      if (sumParts.length === 2 && sumParts[0] !== '' && sumParts[1] !== '' &&
+          !/[eE]$/.test(sumParts[0]) && !/[eE]$/.test(sumParts[1])) {
+        var sumA = Q.fromString(sumParts[0].trim());
+        var sumB = Q.fromString(sumParts[1].trim());
+        if (!sumA.isNaN() && !sumB.isNaN()) {
+          var sumV = sumA.add(sumB);
+          if (negateIt) sumV.sign = -sumV.sign;
+          return sumV;
+        }
+      }
     }
 
     var layerMatch = s.match(/^\u03C9\^(\d+)\s*/);
@@ -5288,11 +5556,10 @@
 
       // Parse spaced letter-chain notation (round-trip of toString output):
       //   "M^7 L^8 K^8 ... E^8 10000000000"  finite levels with ^counts
-      //   "GF^2 E^3 123"                     letters + ^counts (last letter gets count)
+      //   "GF^2 E^3 123"                     letters + ^counts (last gets count)
       //   "3Aa25 100"                        high finite level (> 22) with base
-      //   "AaAa E^8 100"                     compact ordinal tokens + spaced chain
-      //   "F^9 EE100"                        spaced chain + compact letters + base
-      // Must come before aaMatch so "3Aa25 100" keeps its trailing base value.
+      //   "AaAa E^8 100" / "F^9 EE100"       compact tokens + spaced chain
+      // Must come before aaMatch so "3Aa25 100" keeps its trailing base.
       var chainMatch = rem.match(/^((?:[A-Z][a-z]+)*)((?:(?:[A-Z]+\^\d+|\d+Aa\d+)\s+)+)([A-Z]*)(\d+(?:\.\d+)?)\s*$/);
       if (chainMatch) {
         var chainOk = true;
@@ -5395,19 +5662,34 @@
         }
       }
 
-      var aaMatch = rem.match(/^(\d+)Aa(\d+)/i);
+      // #19 — the Aa diagonal (README: Aaα = 10{α}10, so the bare Aaα and the
+      // binary 2Aaα coincide; the general binary form is αAaβ = 10{β+1}α).
+      // The old path stored the raw coefficient row [10,0,…,0,count] — that is
+      // 10{β+1}(count+1), one application too many: 2Aa3 came out as
+      // [[10^10,8,8,1]] (= 10{4}3) instead of 10{3}10 = [[10^10,8,8]].
+      var aaMatch = rem.match(/^(\d+)Aa(\d+(?:\.\d+)?)$/i);
       if (aaMatch) {
-        var aaCount = aaMatch[1] ? Number(aaMatch[1]) : 1;
+        var aaCount = Number(aaMatch[1]);
         var aaN = Number(aaMatch[2]);
-        if (!isNaN(aaN) && isFinite(aaN) && aaN >= 1 && aaN === Math.floor(aaN)) {
-          if (aaN < MetaNum.maxCols) {
-            x.array[0] = [10];
-            x.array[0][aaN] = aaCount;
-          } else {
-            x.array = [[10], [aaCount, aaN]];
-          }
-          if (negateIt) x.sign = -1;
-          return x.normalize();
+        if (!isNaN(aaN) && isFinite(aaN) && aaN >= 0 && isFinite(aaCount) && aaCount >= 1) {
+          var aaVal = MetaNum.TEN.clone().arrow(aaN + 1)(aaCount);   // 10{β+1}α
+          if (negateIt) aaVal.sign = -1;
+          return aaVal;
+        }
+      }
+
+      // Bare Aa<n> (no mantissa): the diagonal itself — Aaα = 10{α}10 for
+      // every real α (README "Defining Aa").  A level below 1 has no engine
+      // arrow, so apply rule (iii): 10{α}10 = 10{1}(2·5^α).
+      var aaBareMatch = rem.match(/^Aa(\d+(?:\.\d+)?)$/i);
+      if (aaBareMatch) {
+        var abN = Number(aaBareMatch[1]);
+        if (isFinite(abN) && abN >= 0) {
+          var abVal;
+          if (abN < 1) abVal = MetaNum.TEN.clone().arrow(1)(2 * Math.pow(5, abN));
+          else abVal = MetaNum.TEN.clone().arrow(abN)(MetaNum.TEN.clone());
+          if (negateIt) abVal.sign = -1;
+          return abVal;
         }
       }
 
@@ -5423,13 +5705,92 @@
         return innerS.normalize();
       }
 
-      // Canonical diagonal-letter output "mantissa LETTER β" where LETTER is
-      // any multi-letter token ending in 'a' (Aa, Ba, Aaa, Aaaa, …), with the
-      // dlsdl diagonal mantissa α ∈ [2,10):
-      //   exact anchor α=2.000 -> the plain letter application LETTER(β)
-      //     (2·5^0=2 adds nothing);
-      //   fractional α -> compact smooth row [α, β] (r0=[1]), the same
-      //     representation the engine emits for 10{β}(structured counts).
+      // !Aaα with a real (non-integer) α — decision 1B: !Aaα ≡ A(a×⌊α⌋)(α),
+      // the letter token with ⌊α⌋ lowercase a's applied at argument α.  Keeps
+      // the integer anchors and extends them continuously inside each unit
+      // interval (!Aa1.5 = Aa1.5, !Aa2.5 = Aaa2.5).  Must run before
+      // diagBinMatch: "!Aa1.5" has no mantissa in front.
+      var bangAaMatch = rem.match(/^!Aa(\d+\.\d+)$/);
+      if (bangAaMatch) {
+        var baA = Number(bangAaMatch[1]);
+        if (isFinite(baA) && baA > 0) {
+          var baN = Math.max(1, Math.floor(baA));
+          var baTok = "A" + new Array(baN + 1).join("a");
+          var baVal = Q.fromString(baTok + String(baA));
+          if (negateIt) baVal.sign = -1;
+          return baVal;
+        }
+      }
+
+      // !αAaβ binary diagonal (notation-semantics §2, decision 1B):
+      //   !αAaβ = !Aa(β + log₅(α/2))
+      // Built as the de-layered instance A(a×⌊x⌋)(x) when the row fits maxCols,
+      // else the layer-1 marker.  Must run before diagBinMatch so the α≠2 case
+      // stops using the lossy compact row.  α = 1.000 (legacy "no mantissa") is
+      // left to the 1.0+-strip below; α = 1 without decimals follows the
+      // formula.
+      var aaBinMatch = rem.match(/^!(\d+(?:\.\d+)?)Aa(\d+(?:\.\d+)?(?:[Ee]\d+)?)$/);
+      if (aaBinMatch) {
+        var aaMant = Number(aaBinMatch[1]);
+        var aaBeta = Number(aaBinMatch[2]);
+        var aaSkipLegacy = (aaMant === 1 && aaBinMatch[1].indexOf('.') >= 0);
+        if (!aaSkipLegacy && isFinite(aaMant) && aaMant > 0 &&
+            isFinite(aaBeta) && aaBeta >= 0) {
+          var aaX = aaBeta + Math.log(aaMant / 2) / Math.log(5);
+          if (aaX >= 1 && aaX === Math.floor(aaX)) {
+            // #19: an INTEGER !Aa<n> is the full rule-3 cascade of 10{ω^n}10
+            // (layer 0) — "!" adds one ω^ to the level.  Past the row budget
+            // bangAaInteger goes one layer up with the de-!-ed compact.
+            var anVal = bangAaInteger(aaX, 0);
+            anVal.sign = 1;
+            if (negateIt) anVal.sign = -1;
+            return anVal;
+          }
+          var aaK = Math.max(1, Math.floor(aaX));
+          var aaVal = new MetaNum();
+          if (aaX >= 1 && aaK + 2 <= MetaNum.maxCols) {
+            var aaRow = [1];
+            for (var ai = 0; ai < aaK; ai++) aaRow.push(0);
+            aaRow.push(1);
+            aaVal.array = [[aaX], aaRow];
+            aaVal.layer = 0;
+          } else {
+            aaVal.array = [[aaX], [1, 0, 1]];
+            aaVal.layer = (aaX >= 1) ? 1 : 0;
+          }
+          aaVal.sign = 1;
+          aaVal.normalize();
+          if (negateIt) aaVal.sign = -1;
+          return aaVal;
+        }
+      }
+
+      // #26 — legacy binary form with diagonal depth k≥2: [sym] α A(a×k) β
+      // is [sym] A(a×k)(β + log₅(α/2)).  Current format() uses the exact
+      // token spelling (Aaa1.5) for these values, but the older
+      // @Aa1.5 → "!4.472Aaa1" / #Aa2.5 → "@4.472Aaaa2" spellings must keep
+      // parsing to the right depth.  (k=1 keeps decision-1B semantics above.)
+      var aaDeepMatch = rem.match(/^([!@#\$%&~<>?]?)(\d+(?:\.\d+)?)A(a{2,})(\d+(?:\.\d+)?(?:[Ee]\d+)?)$/);
+      if (aaDeepMatch) {
+        var adSym = aaDeepMatch[1] || "";
+        var adAlpha = Number(aaDeepMatch[2]);
+        var adDepth = aaDeepMatch[3].length;
+        var adBeta = Number(aaDeepMatch[4]);
+        if (isFinite(adAlpha) && adAlpha > 0 && isFinite(adBeta)) {
+          var adX = adBeta + Math.log(adAlpha / 2) / Math.log(5);
+          var adVal = Q.fromString("A" + new Array(adDepth + 1).join("a") + String(adX));
+          if (adSym) {
+            adVal.layer = (adVal.layer || 0) + ("!@#$%&~<>?".indexOf(adSym) + 1);
+          }
+          if (negateIt) adVal.sign = -1;
+          return adVal;
+        }
+      }
+
+      // Canonical diagonal-letter output "mantissa LETTER β" (LETTER any
+      // multi-letter token ending in 'a'), with the dlsdl diagonal mantissa
+      // α ∈ [2,10): the exact anchor α=2.000 gives the plain letter application
+      // LETTER(β); a fractional α gives the compact smooth row [α, β] (r0=[1]).
       var diagBinMatch = rem.match(/^([!@#\$%&~<>?]?)(\d+\.\d+)([A-Z][a-z]+)(\d[\d,]*)\s*$/);
       if (diagBinMatch) {
         var dbSym = diagBinMatch[1];
@@ -5461,8 +5822,62 @@
       // the fractional-argument machinery and is not accepted here.
       rem = rem.replace(/^([!@#\$%&~<>?]?)1\.0+(?=[A-Z])/, '$1');
 
+      // #19 — layer symbol + SINGLE-letter form.  format() emits this for
+      // @Aa1 (!1.000N10) and for @Aa<n> past multiLetterLimit.  Parse the
+      // inner value at layer 0 first, then add exactly one layer per symbol
+      // (! → 1, @ → 2, …).  Setting the layer before parsing would make the
+      // normalizer rewrite the inner cascade into a row and lose its shape.
+      var symSingleMatch = rem.match(/^([!@#\$%&~<>?])([A-Z])(\d+(?:\.\d+)?(?:[Ee]\d+)?)$/);
+      if (symSingleMatch) {
+        var ssVal = Q.fromString(symSingleMatch[2] + symSingleMatch[3]);
+        ssVal.layer = (ssVal.layer || 0) +
+          ("!@#$%&~<>?".indexOf(symSingleMatch[1]) + 1);
+        if (negateIt) ssVal.sign = -1;
+        return ssVal;
+      }
+
+      // #20 — α + single letter (F..Z) + β: αΓβ = Γ(β + log10 α).
+      // format() emits this for the sub-unit diagonal (Aa1.9 → 3.261F8).
+      // E is deliberately excluded: it is scientific notation above.
+      var alphaSingleMatch = rem.match(/^(\d+(?:\.\d+)?)([F-Z])(\d+(?:\.\d+)?(?:[Ee]\d+)?)$/);
+      var alphaSingleSymMatch = rem.match(/^([!@#\$%&~<>?])(\d+(?:\.\d+)?)([F-Z])(\d+(?:\.\d+)?(?:[Ee]\d+)?)$/);
+      if (alphaSingleMatch || alphaSingleSymMatch) {
+        var alsSym = alphaSingleSymMatch ? alphaSingleSymMatch[1] : "";
+        var alsAlpha = Number(alphaSingleSymMatch ? alphaSingleSymMatch[2] : alphaSingleMatch[1]);
+        var alsLetter = alphaSingleSymMatch ? alphaSingleSymMatch[3] : alphaSingleMatch[2];
+        var alsBeta = Number(alphaSingleSymMatch ? alphaSingleSymMatch[4] : alphaSingleMatch[3]);
+        if (isFinite(alsAlpha) && alsAlpha > 0 && isFinite(alsBeta)) {
+          var alsVal = Q.fromString(alsLetter + String(alsBeta + Math.log10(alsAlpha)));
+          if (alsSym) {
+            alsVal.layer = (alsVal.layer || 0) +
+              ("!@#$%&~<>?".indexOf(alsSym) + 1);
+          }
+          if (negateIt) alsVal.sign = -1;
+          return alsVal;
+        }
+      }
+
+      // #19 — the symbol layers of the Aa diagonal: every symbol adds one ω^
+      // (!Aa<n> = 10{ω^n}10 layer 0, @Aa<n> layer 1, #Aa<n> layer 2, …), so the
+      // same rule-3 cascade is stored and `layer` carries the extra ω^'s.
+      // Mantissa 2 (or 2.000) is the diagonal anchor (2·5^0 = 2); other
+      // mantissas keep the smooth decision-1B path below.
+      var aaSymMatch = rem.match(/^([!@#\$%&~<>?])(2(?:\.0+)?)?Aa(\d+)$/);
+      if (aaSymMatch) {
+        var asIdx = "!@#$%&~<>?".indexOf(aaSymMatch[1]);
+        var asN = Number(aaSymMatch[3]);
+        if (asIdx >= 0 && isFinite(asN) && asN >= 1 && asN === Math.floor(asN)) {
+          var asVal = bangAaInteger(asN, asIdx);   // "!" → layer 0, "@" → 1, …
+          asVal.sign = 1;
+          if (negateIt) asVal.sign = -1;
+          return asVal;
+        }
+      }
+
       // Handle layer symbol prefix + letter pattern + optional finOps + number (e.g., !Abcd1234, !AaE16, @Bcde500)
-      var symPrefixMatch = rem.match(/^([!@#\$%&~<>?])([A-Z][a-z]+(?:[A-Z][a-z]+)*)([A-Z]*)(\d+)\s*$/);
+      // Tokens may carry "^count" application counts and be space-separated —
+      // the toString spelling of multi-row ordinal cascades ("!Ijj^8 … 10").
+      var symPrefixMatch = rem.match(/^([!@#\$%&~<>?])((?:[A-Z][a-z]+(?:\^\d+)?\s*)+)([A-Z]*)((?:\d+(?:\.\d+)?(?:[Ee]\d+)?))\s*$/);
       if (symPrefixMatch) {
         var SYMBOL_LAYERS_P = {'!': 1, '@': 2, '#': 3, '$': 4, '%': 5, '&': 6, '~': 7, '<': 8, '>': 9, '?': 10};
         x.layer = SYMBOL_LAYERS_P[symPrefixMatch[1]] || 1;
@@ -5470,30 +5885,32 @@
         rem = symPrefixMatch[2] + (symPrefixMatch[3] || '') + symPrefixMatch[4];
       }
 
-      // Ordinal-prefix chain with a full number argument — the argument may be
-      // a plain integer ("AaG5"), a decimal ("AaG5.5"), or a sci-notation value
-      // ("AaGF7.626E12", the round-trip of format() displays like "AaGF7.626E12"
-      // whose letter chain carries a huge finite-arg). The old (\d+) regex ate
-      // only "7" and silently dropped ".626E12".
-      var oaMatch = rem.match(/^((?:[A-Z][a-z]+)+)([A-Z]*)((?:\d+(?:\.\d+)?(?:[Ee]\d+)?))$/);
+      // Ordinal-prefix chain with a full number argument — plain integer
+      // ("AaG5"), decimal ("AaG5.5") or sci-notation ("AaGF7.626E12"); the old
+      // (\d+) regex ate only "7" and dropped ".626E12".  Each token may carry
+      // an explicit count ("Ijj^8", the toString spelling of a row whose count
+      // reached the ^n form) and tokens may be space-separated (keeping "^8"
+      // apart from the trailing base digits).
+      var oaMatch = rem.match(/^((?:[A-Z][a-z]+(?:\^\d+)?\s*)+)([A-Z]*)((?:\d+(?:\.\d+)?(?:[Ee]\d+)?))$/);
       if (oaMatch) {
         var oaFullPrefix = oaMatch[1];
         var oaFinOps = oaMatch[2];
         var oaN = Number(oaMatch[3]);
         if (!isNaN(oaN) && isFinite(oaN) && oaN >= 0) {
           var oaTokens = [];
-          var oaTokenRegex = /[A-Z][a-z]+/g;
+          var oaTokenRegex = /[A-Z][a-z]+(?:\^(\d+))?/g;
           var oaTm;
           while ((oaTm = oaTokenRegex.exec(oaFullPrefix)) !== null) {
-            oaTokens.push(oaTm[0]);
+            oaTokens.push({ token: oaTm[0].split("^")[0], rep: oaTm[1] ? Number(oaTm[1]) : 1 });
           }
 
           var oaGroups = [];
           for (var ti = 0; ti < oaTokens.length; ti++) {
-            if (oaGroups.length > 0 && oaGroups[oaGroups.length - 1].token === oaTokens[ti]) {
-              oaGroups[oaGroups.length - 1].count++;
+            var ot = oaTokens[ti];
+            if (oaGroups.length > 0 && oaGroups[oaGroups.length - 1].token === ot.token) {
+              oaGroups[oaGroups.length - 1].count += ot.rep;
             } else {
-              oaGroups.push({token: oaTokens[ti], count: 1});
+              oaGroups.push({token: ot.token, count: ot.rep});
             }
           }
 
@@ -5624,6 +6041,39 @@
           if (negateIt) x.sign = -1;
           return x.normalize();
         }
+        // The remainder may be a sci-notation number beyond the double range
+        // ("1.537E924") — Number() overflows to Infinity and the letter counts
+        // above were skipped, so the display "EE1.537E924" (the format of
+        // [[924.19,3]]) used to lose BOTH E's on parse.  Convert to the log
+        // form and apply the counts on top: E^k(10^L) = [L, k+1].
+        var sciRest = rem.match(/^([\d.]+)[Ee](-?\d+)\s*$/);
+        if (sciRest) {
+          var sciMantR = Number(sciRest[1]);
+          var sciExpR = Number(sciRest[2]);
+          if (!isNaN(sciMantR) && isFinite(sciMantR) && isFinite(sciExpR) && sciMantR > 0) {
+            var logValR = Math.log10(sciMantR) + sciExpR;
+            var countsR = {};
+            var maxIdxR = 0;
+            for (var ri = 0; ri < prefix.length; ri++) {
+              var letterPosR = prefix.charCodeAt(ri) - 64;
+              if (letterPosR >= 5) {
+                var idxR = letterPosR - 4;
+                countsR[idxR] = (countsR[idxR] || 0) + 1;
+                maxIdxR = Math.max(maxIdxR, idxR);
+              }
+            }
+            if (maxIdxR === 1) {
+              x.array[0] = [logValR, (countsR[1] || 0) + 1];
+            } else {
+              x.array[0] = [logValR, 1];
+              for (var idx3 = 1; idx3 <= maxIdxR; idx3++) {
+                x.array[0][idx3] = (x.array[0][idx3] || 0) + (countsR[idx3] || 0);
+              }
+            }
+            if (negateIt) x.sign = -1;
+            return x.normalize();
+          }
+        }
       }
 
       // Parse scientific notation with extreme exponents (e.g., 1E-1000000, 1E1000000)
@@ -5663,15 +6113,11 @@
 
   
   // ==================== BEAF Ordinal Helpers ====================
-  // Build ordinal coefficient array from BEAF args:
-  //   BEAF(a,b,c,d,e,f,...) = a{...+ω^3*(f-1)+ω^2*(e-1)+ω*(d-1)+c}b
-  //   coeffs[0] = c (ω^0 = constant term, no decrement)
-  //   coeffs[1] = d-1 (ω^1 coefficient)
-  //   coeffs[2] = e-1 (ω^2 coefficient)
-  //   coeffs[3] = f-1 (ω^3 coefficient)
-  // An argument whose value exceeds MSI (or carries ordinal structure) cannot
-  // serve as an exact coefficient: it is reported in hugeArgs and the caller
-  // supremum-collapses it (ω^i*HUGE ≈ ω^(i+1)).
+  // BEAF(a,b,c,d,e,f,...) = a{...+ω^3*(f-1)+ω^2*(e-1)+ω*(d-1)+c}b, so
+  // coeffs = [c, d-1, e-1, f-1, …] (the constant term is not decremented).
+  // An argument beyond MSI (or with ordinal structure) cannot be an exact
+  // coefficient: it is reported in hugeArgs and supremum-collapsed
+  // (ω^i*HUGE ≈ ω^(i+1)).
   Q._buildOrdinalCoeffs = function(args) {
     var coeffs = [];
     var hugeArgs = [];
@@ -5692,13 +6138,11 @@
     return { coeffs: coeffs, hugeArgs: hugeArgs };
   };
 
-  // Ordinal BEAF computation for 4+ arguments:
-  //   BEAF(a,b,c,d,...) = a{...+ω*d+c}b via the unified ordinal engine.
-  // Huge coefficients (> MSI / ordinal args) supremum-collapse:
-  //   ω^i*HUGE ≈ ω^(i+1) with all lower coefficients swallowed, e.g.
-  //   4{ω*5+X}2 = 4{ω*6}X (X huge) → X plus one ω*6 row;
-  //   4{ω*X+3}2 = 4{ω^2}X        → X plus one ω^2 row.
-  // The result anchors at the largest operand (the huge argument's value).
+  // Ordinal BEAF computation for 4+ arguments: BEAF(a,b,c,d,...) =
+  // a{...+ω*d+c}b via the unified ordinal engine.  Huge coefficients (> MSI /
+  // ordinal args) supremum-collapse (ω^i*HUGE ≈ ω^(i+1), lower coefficients
+  // swallowed): 4{ω*5+X}2 = 4{ω*6}X, 4{ω*X+3}2 = 4{ω^2}X.  The result anchors
+  // at the largest operand.
   Q._beafOrdinal = function(a, b, coeffs, hugeArgs) {
     a = new MetaNum(a);
     b = new MetaNum(b);
@@ -5726,23 +6170,23 @@
   };
 
   // ==================== Hardy Hierarchy ====================
-  // H_α(n) via transfinite recursion (issues.md / README):
-  //   H_0(n) = n
-  //   H_{α+1}(n) = H_α(n+1)          (successor step: only +1, never iterated)
-  //   H_λ(n) = H_{λ[n]}(n)           (limit step: CNF fundamental sequence at n)
-  // where λ[n] acts on the lowest limit term: (… + ω^j·c_j)[n] = … + ω^j·(c_j−1)
-  // + ω^{j−1}·n.  Closed forms keep the recursion finite:
-  //   H_{β+c}(n)   = H_β(n+c)        (c successor steps)
-  //   H_{β+ω·c}(n) = H_β(n·2^c)      (c ω-level limit steps)
-  // For ω^j·c segments with c beyond the exact-iteration bound (j ≥ 2) the
-  // value collapses into the hyperoperation engine, mirroring the classic
-  // identity F_j = H^{ω^j} (F_2(n)=n·2^n, F_3(n)≈2↑↑n, …):
-  //   H_{β+ω^j·c}(n) ≈ H_β(2{c}^j)   i.e. 2.arrow(j)(c)
+  // H_α(n) by transfinite recursion: H_0(n)=n, H_{α+1}(n)=H_α(n+1),
+  // H_λ(n)=H_{λ[n]}(n), where λ[n] hits the lowest limit term
+  // (…+ω^j·c_j)[n] = …+ω^j·(c_j−1)+ω^{j−1}·n.  Closed forms keep it finite:
+  //   H_{β+c}(n) = H_β(n+c);   H_{β+ω·c}(n) = H_β(n·2^c).
+  // Beyond the exact-iteration bound (j ≥ 2) an ω^j·c segment collapses into
+  // the hyperoperation engine (F_j = H^{ω^j}):  H_{β+ω^j·c}(n) ≈ H_β(2{c}^j).
   var HARDY_EXACT_BOUND = 50;
   // H_α(n) — ITERATIVE (the original tail recursion grew hundreds of frames
   // deep for inputs like hardy(1e10+20) where n1≈40 makes every ω^j segment
   // take the exact branch: Maximum call stack size exceeded).
   Q._hardyH = function (coeffs, nArg) {
+    // Coefficients are read/written STRUCTURALLY below (c[j] -= 1, c[j-1] = n,
+    // c_j compared against HARDY_EXACT_BOUND) and a fractional coefficient is
+    // the normal case once the running base is 10+f — the sub-unit canonical
+    // form must not rewrite them into reciprocals.
+    _skipCanon++;
+    try {
     function MN(v) { return (v instanceof MetaNum) ? v.clone() : new MetaNum(v || 0); }
     var c = [];
     for (var i0 = 0; i0 < coeffs.length; i0++) c.push(MN(coeffs[i0]));
@@ -5777,6 +6221,18 @@
         n = nWf;
         continue;
       }
+      if (j >= c.length) return n;       // no positive term left (safety net)
+      // A coefficient can turn FRACTIONAL because the FS step writes the
+      // running base n (n = 10+f for a fractional hardy input).  For
+      // 0 < c_j < 1 the "-1" step would go negative, so take the PARTIAL step:
+      // ω^j·f contributes ω^(j-1)·(n·f) — continuous, f→1 is the full
+      // ω^(j-1)·n step and f→0 contributes nothing.
+      var cjN = c[j].toNumber();
+      if (isFinite(cjN) && cjN > 0 && cjN < 1 && j >= 2) {
+        c[j] = MetaNum.ZERO.clone();
+        c[j - 1] = n.mul(new MetaNum(Number(cjN.toPrecision(15))));
+        continue;
+      }
       if (c[j].gt(HARDY_EXACT_BOUND)) {                    // engine collapse
         // H_{β + ω^j·c}(n) ≈ H_β(2{c}j) — evaluate with the OLD c[j]
         var nCol = new MetaNum(2).arrow(j)(c[j]);
@@ -5793,13 +6249,230 @@
     }
     // budget exhausted: keep whatever was accumulated (monotone)
     return n;
+    } finally { _skipCanon--; }
   };
 
-  // MetaNum.hardy(n): the Hardy level of n.
+  // H_{ω^k}(n), the from-below base of hardy (n ≥ 1e10).  The exact expansion
+  // writes a tower of level k-1 (H_{ω^10}(10) = 10{9}(11…21)), so array[0]
+  // holds k entries and only fits while k ≤ maxCols.  Above that the running
+  // base and the coefficients the limit steps write from it turn structured and
+  // every later comparison/collapse is meaningless (hardy(1e10+11) collapsed to
+  // [[1],[2,20]]), so the value is taken from the engine instead:
+  // 10{k-1}(n+1) is exactly the lower bound the exact expansion stays above.
+  Q._hardyOmegaPower = function (n1) {
+    var n1Num = (n1.layer === 0 && n1.array.length === 1 && n1.array[0].length === 1) ? n1.toNumber() : Infinity;
+    if (isFinite(n1Num) && n1Num >= 2) {
+      var kFit = Math.floor(n1Num);
+      if (kFit <= MetaNum.maxCols + 1) {
+        // exact expansion — a fractional base (hardy("1e10+0.5"), n = 10+f)
+        // flows through the fundamental-sequence steps (the partial-step rule
+        // keeps the coefficients sane) and collapses into ONE plain row: the
+        // fractional hyper-operation result, between hardy(1e10) and
+        // hardy(1e10+1)
+        var ec = [];
+        for (var zi = 0; zi < kFit; zi++) ec.push(0);
+        ec.push(1);
+        return Q._hardyH(ec, n1);
+      }
+      // n1 > maxCols+1: the exact tower [c0, (n1-1)×(n1-2)] no longer fits
+      // (22 entries for n1 = 22).  Keep the TRUNCATED cascade (level n1-1 over
+      // the definitional base) instead of 10{n1-1}(n1+1): hardy("1e10+11") =
+      // [3086.036…, 21×19] — strictly above hardy("1e10+10")'s exact
+      // [6313063, 19×18] and far below 10{ω^ω+ω+1}10.
+      var lv = Math.floor(n1Num) - 1;
+      var depth = Math.min(Math.floor(n1Num) - 2, MetaNum.maxCols - 1);
+      var r0 = Q._hardyBaseR0();
+      var arr = [r0[0]];
+      for (var di = 0; di < depth; di++) arr.push(lv);
+      var out = new MetaNum(0);
+      out.array = [arr];
+      return out.normalize();
+    }
+    // structured / fractional operand: one ω-diagonal row (engine convention)
+    return Q._applyOrdinalRows(n1, [0, 1], 1);
+  };
+
+  // Decimal digit string of a plain number stored as r0 = [v, 1] (= 10^v), or
+  // null when the value is not in that form.  Only an actual POWER TOWER is
+  // excluded (10^^k has the same shape but v ≥ 1e10), so "1e100000" keeps the
+  // ordinary digit path — the old guard pushed it into the tower branch.
+  Q._hardyDigitsOfPowForm = function (r0) {
+    if (!r0 || r0.length !== 2 || r0[1] !== 1 || !isFinite(r0[0])) return null;
+    if (r0[0] >= 1e10) return null;                  // power tower → slog branch
+    var exN = Math.floor(r0[0]);
+    if (exN < 0 || exN > 1000000) return null;       // digit string budget
+    var mantN = Math.pow(10, r0[0] - exN);
+    if (!isFinite(mantN)) return null;
+    // the exponent is stored with ~15 significant digits, so the reconstructed
+    // mantissa carries a rounding tail — 2e1000 is stored as 10^1000.301029995664
+    // and 10^0.301029995664 = 1.9999999999999…, which would spell the digits
+    // "19999…9" instead of "2000…0".  Round the mantissa to the digits the
+    // exponent can actually hold before spelling it out.
+    if (mantN > 0) mantN = Number(mantN.toPrecision(12));
+    if (mantN >= 10 - 1e-9) { mantN /= 10; exN += 1; }
+    var digN = String(mantN).replace('.', '');
+    var zeroN = exN - (digN.length - 1);
+    if (zeroN < 0) return null;
+    return digN + '0'.repeat(zeroN);
+  };
+
+  // r0 of the definitional from-below base H_{ω^10}(10) = 10{9}(11…21) — the
+  // base every hardy(n ≥ 1e10) value is built on.
+  Q._hardyBaseR0 = function () {
+    return Q._hardyOmegaPower(MetaNum.TEN.clone()).array[0].slice();
+  };
+
+  // issues.md truncation marker: once the ordinal rows overflow, the engine
+  // collapses the base to [10].  hardy keeps its definitional base instead —
+  // every level above it is carried by the ordinal rows, so the truncation
+  // loses nothing but the unnameable low levels, and the value stays bigger
+  // than the marker base (hardy is monotone across the truncation point).
+  Q._hardyKeepBase = function (v) {
+    var r0 = v.array[0];
+    if (r0 && r0.length === 1 && r0[0] === 10) v.array[0] = Q._hardyBaseR0();
+    return v;
+  };
+
+  // hardy(n, base): H_α(base), where α is built from the base-`base` digits of
+  // n (hardy(1234) = H_{ω³+ω²·2+ω·3+4}(10); hardy(10,8) = H_{ω+2}(8) = 20
+  // because "10" reads as "12" in base 8).  base defaults to 10 and must be an
+  // integer in [2, 1000].  The base-10 path is the historical implementation;
+  // other bases read the same ordinal off their own digit expansion.
+  Q.hardy = function (n, base) {
+    var b = hardyBase(base);
+    if (b === 10) return Q._hardyDecimal(n);
+    return Q._hardyBased(n, b);
+  };
+
+  // Base argument validation (undefined → the default 10).
+  function hardyBase(base) {
+    if (base === undefined || base === null) return 10;
+    var b = (base instanceof MetaNum) ? base.toNumber() : base;
+    if (typeof b !== 'number' || !isFinite(b) || b !== Math.floor(b) || b < 2 || b > 1000) {
+      throw Error(metaNumError + 'hardy: base must be an integer in [2, 1000]');
+    }
+    return b;
+  }
+
+  // FGH(x, y) = H_{y^x}(y): the fast-growing hierarchy entry, defined through
+  // hardy (f_x(y) with the hereditary base-y reading of y^x).
+  Q.fgh = function (x, y) {
+    var b = hardyBase(y);
+    x = new MetaNum(x);
+    if (x.isNaN()) return MetaNum.NaN.clone();
+    var arg = new MetaNum(b).pow(x);
+    return Q._hardyBased(arg, b);
+  };
+
+  // Little-endian CNF coefficients of the base-b expansion of a decimal digit
+  // string (most significant first), or null past the digit budget.  Repeated
+  // division on the digit string keeps values beyond the double range exact.
+  function hardyBaseCoeffs(decStr, b) {
+    if (b === 10) {
+      var c10 = [];
+      for (var i = decStr.length - 1; i >= 0; i--) c10.push(decStr.charCodeAt(i) - 48);
+      return c10;
+    }
+    var coeffs = [];
+    var cur = decStr.replace(/^0+/, '');
+    if (cur === '') cur = '0';
+    var guard = 0;
+    while (cur !== '0') {
+      if (++guard > 100000 || coeffs.length > 100000) return null;
+      var q = '';
+      var rem = 0;
+      for (var i = 0; i < cur.length; i++) {
+        var acc = rem * 10 + (cur.charCodeAt(i) - 48);
+        var d = Math.floor(acc / b);
+        rem = acc - d * b;
+        q += String.fromCharCode(48 + d);
+      }
+      cur = q.replace(/^0+/, '') || '0';
+      coeffs.push(rem);
+    }
+    return coeffs;
+  }
+
+  // hardy(n, base) for base ≠ 10: the ordinal is read off the base-`base`
+  // digits of n and evaluated on the argument `base` (+ any fraction of n).
+  // Plain finite inputs only — structured / tower inputs keep the base-10
+  // shadowing, which is decimal-specific.
+  Q._hardyBased = function (n, b) {
+    var rawNum = (typeof n === 'number') ? n
+      : (typeof n === 'string' ? Number(n) : null);
+    if (typeof n === 'string' && n.indexOf('+') > 0) {
+      var plusParts = n.split('+');
+      if (plusParts.length === 2 && plusParts[0] !== '' && plusParts[1] !== '' &&
+          !/[eE]$/.test(plusParts[0]) && !/[eE]$/.test(plusParts[1])) {
+        var pvA = new MetaNum(plusParts[0].trim());
+        var pvB = new MetaNum(plusParts[1].trim());
+        if (!pvA.isNaN() && !pvB.isNaN()) { n = pvA.add(pvB); rawNum = null; }
+      }
+    }
+    if (rawNum !== null && !isFinite(rawNum)) rawNum = null;
+    n = new MetaNum(n);
+    if (n.sign !== 1) {
+      throw Error(metaNumError + 'hardy: n must be a non-negative integer');
+    }
+    var num = (rawNum !== null) ? rawNum
+      : ((n.layer === 0 && n.array.length === 1) ? n.toNumber() : Infinity);
+    var hStr = (rawNum === null && n.layer === 0 && n.array.length === 1)
+      ? Q._hardyDigitsOfPowForm(n.array[0]) : null;
+    if (!isFinite(num)) {
+      if (n.layer === 0 && n.array.length === 1 && hStr !== null) {
+        // a plain number beyond the double range: its exact digits
+      } else {
+        throw Error(metaNumError + 'hardy: base != 10 supports plain finite inputs only');
+      }
+    }
+    var s = (hStr !== null) ? hStr : String(num);
+    var eMatch = s.match(/^(\d)(?:\.(\d+))?e\+?(\d+)$/);
+    if (eMatch) {
+      var eFrac = eMatch[2] || '';
+      var eZeros = Number(eMatch[3]) - eFrac.length;
+      if (eZeros > 0) s = eMatch[1] + eFrac + '0'.repeat(eZeros);
+    }
+    var hFrac = 0;
+    var hDot = s.indexOf('.');
+    if (hDot >= 0) {
+      hFrac = Number('0.' + s.slice(hDot + 1));
+      s = s.slice(0, hDot);
+    }
+    var coeffs = hardyBaseCoeffs(s, b);
+    if (coeffs === null) {
+      throw Error(metaNumError + 'hardy: base expansion exceeds the digit budget');
+    }
+    return Q._hardyH(coeffs, new MetaNum(b + hFrac));
+  };
+
+  // MetaNum.hardy(n): the Hardy level of n (base 10).
   //   n < 10 → 10 + n;  otherwise the decimal digits of n become the CNF
   //   coefficients of an ordinal α (hardy(1234) = H_{ω³+ω²·2+ω·3+4}(10)) and
   //   the result is H_α(10).
-  Q.hardy = function (n) {
+  Q._hardyDecimal = function (n) {
+    // A plain JS number / numeric string keeps its own decimal expansion: from
+    // 1e16 on the library stores the value as 10^v (r0 = [v,1]) and the way
+    // back through the double loses the low digits — hardy(1e16+1e13) =
+    // hardy(10010000000000000) reads back as 10010000000000014, so the digit
+    // path would take 14 instead of 1e13 as the "rest" of the ordinal.
+    var rawNum = (typeof n === 'number') ? n
+      : (typeof n === 'string' ? Number(n) : null);
+    // v2.0.2: "1e10+0.5" / "1e10+11" / "1e16+1e13" — the digit path needs the
+    // exact decimal value, and Number('1e10+0.5') is NaN (the old path read 0 →
+    // hardy(0) = 10 → the [10] base).  Split the sum and add the parts exactly.
+    if (typeof n === 'string' && n.indexOf('+') > 0) {
+      var plusParts = n.split('+');
+      if (plusParts.length === 2 && plusParts[0] !== '' && plusParts[1] !== '' &&
+          !/[eE]$/.test(plusParts[0]) && !/[eE]$/.test(plusParts[1])) {
+        var pvA = new MetaNum(plusParts[0].trim());
+        var pvB = new MetaNum(plusParts[1].trim());
+        if (!pvA.isNaN() && !pvB.isNaN()) {
+          n = pvA.add(pvB);
+          rawNum = null;
+        }
+      }
+    }
+    if (rawNum !== null && !isFinite(rawNum)) rawNum = null;
     n = new MetaNum(n);
     if (n.sign !== 1) {
       throw Error(metaNumError + 'hardy: n must be a non-negative integer');
@@ -5811,9 +6484,23 @@
     //   hardy(10^^MSI) = the MetaNum limit exactly (slog(10^^MSI) = MSI).
     //   Ordinal-row / ε-layer values sit at their own Hardy position
     //   (H_{ω^β}(10) = 10{β}10) and map to themselves.
-    var num = (n.layer === 0 && n.array.length === 1) ? n.toNumber() : Infinity;
+    var num = (rawNum !== null) ? rawNum
+      : ((n.layer === 0 && n.array.length === 1) ? n.toNumber() : Infinity);
+    // r0 = [v, 1] means 10^v — the plain-number form the library uses once a
+    // value leaves the plain-integer range.  Read the decimal expansion off
+    // that mantissa/exponent pair when the double itself is unavailable
+    // (hardy("1.8e308") — beyond Number.MAX_VALUE).
+    var hStr = (rawNum === null && n.layer === 0 && n.array.length === 1)
+      ? Q._hardyDigitsOfPowForm(n.array[0]) : null;
     if (!isFinite(num)) {
       if (n.layer === 0 && n.array.length === 1) {
+        // v2.0.2: a PLAIN number that merely exceeds the double range (hardy
+        // ("1.8e308") — 1.8e308 > Number.MAX_VALUE) is not a power tower, so it
+        // must not fall into the tower branch: read its decimal expansion and
+        // keep the ordinary digit path (hardy(1.8e308) stays layer 0).
+        // (A tower 10^^k has the same shape but v ≥ 1e10, so the size guard
+        // below keeps towers on the slog branch.)
+        if (hStr === null) {
         var hVal = n.slog();
         // a clean power tower shadows to ω^ω^…^ω (k ω's); slog(10^^k) = [[k]]
         // (a plain single number — NOT the structured slog of, say, G600)
@@ -5821,20 +6508,81 @@
           var hNum = hVal.toNumber();
           if (isFinite(hNum) && hNum >= 2 && hNum <= Number.MAX_SAFE_INTEGER) {
             // k ≤ MSI: the tower fits the engine limit (f_ε₀); k > MSI is
-            // beyond ε₀ and the Hardy hierarchy is undefined there → Infinity
-            return MetaNum.TEN.epsilonate(hNum).normalize();
+            // beyond ε₀, where the Hardy hierarchy is undefined → Infinity.
+            // The ordinal is read off the value itself (V = 10^W gives
+            // α = ω^ord(W)): while the height leaves a readable exponent the
+            // result is the ordinary cascade on the from-below base (hardy(ee10)
+            // = the ω^ω cascade, layer 0); above that it becomes a layer marker
+            // of layer ceil(k)-3 (ee20 … eee10 → 1, eee20 … → 2, …).
+            var r0T = n.array[0];
+            // Clean power towers: every extra 10^ level in the input raises
+            // hardy's layer by ONE, the rows stay those of the innermost
+            // readable expansion (hardy("1e308") = the layer-0 cascade,
+            // hardy("e1e308") = the same rows at layer 1, …).  The stored tower
+            // r0 = [v, k] is (k-1) levels over 10^v; layer L adds L more.
+            if (r0T && r0T.length === 2 && r0T[1] >= 1 &&
+                r0T[1] === Math.floor(r0T[1]) &&
+                isFinite(r0T[0]) && r0T[0] >= 10 &&
+                (r0T[1] >= 2 || r0T[0] >= 1e10)) {
+              var towerInner;
+              if (r0T[1] >= 2) {
+                // peel (k-1) levels at once: hardy = layerUp^(k-1)(hardy(10^v))
+                var towerBase = new MetaNum(0);
+                towerBase.sign = 1;
+                towerBase.layer = 0;
+                towerBase.array = [[r0T[0], 1]];
+                towerInner = Q.hardy(towerBase);      // hardy(10^v), layer 0/1
+                return Q._rawLayerMarker(towerInner.array[0],
+                  n.layer + (r0T[1] - 1) + towerInner.layer,
+                  towerInner.array.slice(1));
+              }
+              // single 10^ level over a readable exponent: hardy(10^v) =
+              // layerUp(hardy(v))
+              towerInner = Q.hardy(r0T[0]);
+              return Q._rawLayerMarker(towerInner.array[0], n.layer + 1,
+                towerInner.array.slice(1));
+            }
+            if (hNum <= 3 && r0T && r0T.length === 2 && r0T[1] === 1 &&
+                isFinite(r0T[0]) && r0T[0] >= 10) {
+              return Q._hardyLeading(r0T[0], 1, MetaNum.TEN.clone());
+            }
+            var kc = Math.ceil(hNum - 1e-9);
+            // position inside the band (kc-1, kc]: monotone in the tower height,
+            // kept just below 1 so the layer does not jump at the band edge
+            var kFrac = Math.min(Math.max(hNum - (kc - 1), 0), 0.999999);
+            if (kc <= 4) {
+              // layer 1: 10{ω^y}10 = L1 [[base],[1,y,1]] with y = ω + t, t
+              // growing with the tower height so the band stays monotone —
+              // the base is hardy's definitional from-below base, not the
+              // bare [10] marker (issues: a truncated base keeps
+              // [3086.036,9×8])
+              var tv = Math.max(1, Math.round((hNum - 3) * 1e6));
+              return Q._layerMarker(Q._hardyBaseR0(), 1, [[1, tv, 1]]);
+            }
+            // layer kc-3 ≥ 2: epsilonate(layer+1) carries the fractional tower
+            // height in its base, so the band stays monotone as well
+            // (beyond ~1e15 the fraction is not representable in the exponent)
+            return MetaNum.TEN.epsilonate(
+              kc > 1e15 ? (kc - 2) : (kc - 2 + kFrac)).normalize();
           }
         }
         // layer-0 value beyond a clean 10^^k with k ≤ MSI: finite
         // hyperoperations above tetration (G600, 3{9}3, …) or a tower taller
         // than 10^^MSI exceed the library's ε₀ ceiling → Infinity
         return new MetaNum(Infinity);
+        }
       }
-      // ordinal-row / ε-layer / letter-chain values sit at their own Hardy
-      // position (H_{ω^β}(10) = 10{β}10): map to themselves
-      return n.clone().normalize();
+      // Issue #32: a layer-0 value with ordinal rows (Aa21, Aa100, Aaa16,
+      // !Aa16, …) is past the clean power-tower ceiling.  Reading its decimal
+      // digits as the ordinal gives an α at or beyond ε₀, so the Hardy value
+      // is unrepresentable → Infinity.  (ε-layer values keep the structural
+      // self-map: H_{ω^β}(10) = 10{β}10.)
+      if (hStr === null) {
+        if (n.layer === 0 && n.array.length > 1) return new MetaNum(Infinity);
+        return n.clone().normalize();
+      }
     }
-    var s = String(num);
+    var s = (hStr !== null) ? hStr : String(num);
     // > 1e20 arrives in scientific notation ('1e+21') — expand to the exact
     // decimal digits so the digit-reading stays monotone (issues.md v2.1:
     // hardy must support > 1e15 inputs)
@@ -5844,66 +6592,99 @@
       var eZeros = Number(eMatch[3]) - eFrac.length;
       if (eZeros > 0) s = eMatch[1] + eFrac + '0'.repeat(eZeros);
     }
+    // v2.0.2: fractional argument.  The ordinal is read from the INTEGER part's
+    // digits while the base argument becomes 10+f, so H stays continuous in n:
+    //   hardy(10.38)  = H_ω(10.38)    = 10.38·2      = 20.76
+    //   hardy(100.1)  = H_{ω²}(10.1)  = 10.1·2^10.1  = 11084.709858935355
+    var hFrac = 0;
+    var hDot = s.indexOf('.');
+    if (hDot >= 0) {
+      hFrac = Number('0.' + s.slice(hDot + 1));
+      s = s.slice(0, hDot);
+    }
+    var hArg = hFrac > 0 ? new MetaNum(10 + hFrac) : MetaNum.TEN.clone();
     if (s.length >= 11) {
-      // n ≥ 1e10 (issues.md v2.0): the ordinal is built per definition, then
-      // evaluated from below on the engine's own representation:
-      //   n = dk·10^kExp + rest  →  α = ω^ord(kExp)·dk + ord(rest)
-      //   H_α(10) = H_{ω^ord(kExp)·dk}(H_ord(rest)(10)) — the lower part acts
-      // first: n1 = H_ord(rest)(10) (recursive, exact path for rest < 1e10).
-      //   n1 = H_rest(10) becomes the fundamental-sequence argument of the
-      // leading term:
-      //   kExp = 10 (ord = ω):  H_{ω^ω·dk}(n1) = H_{ω^n1}(n1) exact (first
-      //     segment), the remaining dk−1 ω^ω-segments each add one ω-row —
-      //     hardy(1e10) = H_{ω^10}(10) = [3086.036065328153, 9×8] EXACTLY,
-      //     strictly below 10{10}10 (issues.md);
-      //   kExp ≥ 11 (ord = ω+c): mirror the engine's own ordinal rows for
-      //     10{ω+c}(9+dk) on the from-below base H_{ω^n1}(n1) — hardy(1e11)
-      //     = H_{ω^(ω+1)}(10) keeps expande(10,10)'s row structure with the
-      //     strictly smaller definitional base, so hardy(1e11) < 10{ω+1}10
-      //     (issues.md).
+      // n ≥ 1e10: n = dk·10^kExp + rest → α = ω^ord(kExp)·dk + ord(rest), and
+      // H_α(10) = H_{ω^ord(kExp)·dk}(H_ord(rest)(10)) — the lower part acts
+      // first (n1 = H_rest(10), recursive for rest < 1e10) and then becomes the
+      // fundamental-sequence argument of the leading term.  kExp = 10 (ord ω):
+      // hardy(1e10) = H_{ω^10}(10) = [3086.036065328153, 9×8] exactly; kExp ≥ 11
+      // mirrors the engine's 10{ω+c}(9+dk) rows on the smaller definitional
+      // base, so hardy(1e11) < 10{ω+1}10.
       var kExp = s.length - 1;
       var dk = s.charCodeAt(0) - 48;
-      var restNum = Number(s.slice(1));
-      var n1 = MetaNum.TEN.clone();
-      if (restNum > 0) n1 = Q.hardy(restNum);
-      // from-below base: H_{ω^n1}(n1) — exact for small finite n1, one
-      // ω-diagonal row (engine convention) for huge n1
-      var base;
-      var n1Num = (n1.array.length === 1 && n1.layer === 0) ? n1.toNumber() : Infinity;
-      if (isFinite(n1Num) && n1Num === Math.floor(n1Num) && n1Num >= 2 && n1Num <= 100) {
-        var ec = [];
-        for (var zi = 0; zi < n1Num; zi++) ec.push(0);
-        ec.push(1);
-        base = Q._hardyH(ec, n1);
-      } else {
-        base = Q._applyOrdinalRows(n1, [0, 1], 1);
+      var restStr = s.slice(1);
+      var restNum = Number(restStr);
+      var n1 = hArg.clone();
+      // the fractional part flows into the rest part too: hardy("1e10+1.5")
+      // = H_{ω^10}(hardy(1.5)) = H_{ω^10}(11.5) — dropping the fraction here
+      // made every 1e10+k.f input behave like 1e10+k
+      if (isFinite(restNum) && restNum > 0) n1 = Q.hardy(restNum + hFrac);
+      else if (/[1-9]/.test(restStr)) {
+        // issue #17: the rest itself can exceed the double range — hardy("1.5e309")
+        // has rest = 5e308 > Number.MAX_VALUE, so Number() overflowed to Infinity
+        // and hardy(Infinity) collapsed the whole value to Infinity (integer
+        // mantissas like hardy("1e309") kept working because their rest is 0).
+        // Recurse on the EXACT digit string instead: MetaNum parses it into the
+        // 10^v form and the digit path below reads it back exactly.
+        n1 = Q.hardy(new MetaNum(restStr));
       }
-      if (kExp === 10) {
-        return Q._applyOrdinalRows(base, [0, 1], dk - 1).normalize();
-      }
-      // kExp ≥ 11 (ord = ω+c): mirror the engine's own ordinal rows for
-      // 10{ω+c}(9+dk) onto the from-below base — hardy(1e11) keeps
-      // expande(10,10)'s row structure with the strictly smaller
-      // definitional base, so hardy(1e11) < 10{ω+1}10 (issues.md)
-      var ks = String(kExp);
-      var ordCoeffs = [];
-      for (var oi = ks.length - 1; oi >= 0; oi--) ordCoeffs.push(ks.charCodeAt(oi) - 48);
-      var mir = Q._hyperopFromOrdinalRaw(MetaNum.TEN.clone(), new MetaNum(9 + dk), ordCoeffs);
-      var out = base.clone();
-      for (var ri = 1; ri < mir.array.length; ri++) {
-        out = Q._applyOrdinalRows(out, mir.array[ri].slice(1), mir.array[ri][0]);
-      }
-      return out.normalize();
+      return Q._hardyLeading(kExp, dk, n1);
     }
     if (num < 10) return new MetaNum(10 + num);
     var coeffs = [];
     for (var i = s.length - 1; i >= 0; i--) coeffs.push(s.charCodeAt(i) - 48);
-    return Q._hardyH(coeffs, MetaNum.TEN.clone());
+    return Q._hardyH(coeffs, hArg);
+  };
+
+  // The leading term ω^ord(kExp)·dk of hardy's ordinal, evaluated from below on
+  // the already-computed lower part n1 = H_ord(rest)(10).
+  Q._hardyLeading = function (kExp, dk, n1) {
+      // a plain operand still has a single plain number as its whole array[0]
+      var nPlain = (n1.layer === 0 && n1.array.length === 1 && n1.array[0].length === 1);
+      var n1Num = nPlain ? n1.toNumber() : Infinity;
+      if (kExp === 10) {
+        // H_{ω^ω·dk}(n1): the first ω^ω-segment is H_{ω^n1}(n1) (from below),
+        // every further one adds one ω-row
+        return Q._hardyKeepBase(
+          Q._applyOrdinalRows(Q._hardyOmegaPower(n1), [0, 1], dk - 1)).normalize();
+      }
+      // kExp ≥ 11: β = ord(kExp) and ω^β·dk is dk APPLICATIONS of H_{ω^β}, one
+      // row [1, β] each (hardy(1.1e11) = [3086.036,9×8] [1,1,1]).  The first
+      // application on a plain operand expands from below (base H_{ω^n1}(n1)
+      // plus the 10{β}10 cascade), strictly below 10{ω+1}10.
+      // kExp may be non-integer (the tower branch passes 10^9.05 = 1122018454.3):
+      // only the integer digits spell the ordinal, the fraction raises the
+      // from-below base — reading String(kExp) verbatim put the decimal POINT
+      // into the row (charCode('.')-48 = -2) and inflated it to one column per
+      // character (issue #15: hardy("ee9.05")).
+      var kInt = Math.floor(kExp);
+      var kFracH = kExp - kInt;
+      var ks = String(kInt);
+      var ordCoeffs = [];
+      for (var oi = ks.length - 1; oi >= 0; oi--) ordCoeffs.push(ks.charCodeAt(oi) - 48);
+      var out, extra;
+      if (nPlain && isFinite(n1Num) && n1Num >= 2) {
+        // the fractional part of kExp raises the from-below base (10+f)
+        var baseN1 = (kFracH > 1e-12) ? n1.add(new MetaNum(Number(kFracH.toPrecision(15)))) : n1;
+        out = Q._hardyOmegaPower(baseN1);
+        var mir = Q._hyperopFromOrdinalRaw(MetaNum.TEN.clone(), MetaNum.TEN.clone(), ordCoeffs);
+        for (var ri = 1; ri < mir.array.length; ri++) {
+          out = Q._applyOrdinalRows(out, mir.array[ri].slice(1), mir.array[ri][0]);
+        }
+        extra = dk - 1;
+      } else {
+        // structured operand: H_{ω^β} has no room left to expand into, so each
+        // application is one more row [1, β]
+        out = n1.clone();
+        extra = dk;
+      }
+      if (extra > 0) out = Q._applyOrdinalRows(out, ordCoeffs, extra);
+      return Q._hardyKeepBase(out).normalize();
   };
 
   // ==================== BEAF Array Notation ====================
-  // Bowers' Exploding Array Function: https://googology.fandom.com/wiki/Array_notation
-  // Rules:
+  // Bowers' Exploding Array Function (googology.fandom.com/wiki/Array_notation):
   //   1. {a} = a, {a,b} = a^b
   //   2. {a,b,c,...,n,1} = {a,b,c,...,n}
   //   3. {a,1,b,c,...,n} = a
@@ -5992,14 +6773,20 @@
   };
 
   // Parse BEAF string: {a,b,c,...}
+  // Also accepts the sign/reciprocal spellings toBeaf() emits (issue #21):
+  //   "-{5}" (negative) and "{10,320}⁻¹" (sub-unit).
   Q.fromBeaf = function(str) {
     if (typeof str !== 'string') return MetaNum.NaN.clone();
     var s = str.trim();
+    var negate = false;
+    if (s.charAt(0) === '-') { negate = true; s = s.slice(1).trim(); }
+    var reciprocal = false;
+    if (s.slice(-2) === '\u207B\u00B9') { reciprocal = true; s = s.slice(0, -2).trim(); }
     if (s.charAt(0) !== '{' || s.charAt(s.length - 1) !== '}') {
       return MetaNum.NaN.clone();
     }
     var inner = s.slice(1, -1).trim();
-    if (inner === '') return MetaNum.ONE.clone();
+    if (inner === '') return MetaNum.NaN.clone();
     var parts = inner.split(',');
     var args = [];
     for (var i = 0; i < parts.length; i++) {
@@ -6007,44 +6794,82 @@
       if (!isFinite(val) || val < 1) return MetaNum.NaN.clone();
       args.push(val);
     }
-    return Q.BEAF.apply(null, args);
+    var out = Q.BEAF.apply(null, args);
+    if (reciprocal) out = out.rec();
+    if (negate) out = out.neg();
+    return out;
   };
+
+  // The integer !Aa<n> = 10{ω^n}10 (issue #19: "!" adds one ω^ to the level).
+  // While the ω^n expansion fits the row budget — the cascade's top row
+  // [8, 9×n] needs n+1 ≤ maxCols columns — store the full rule-3 cascade at
+  // `layer` (0 for "!", 1 for "@", …).  Past the budget the cascade would
+  // silently truncate ω^n down to ω^(maxCols-1), so instead go ONE LAYER UP
+  // and keep the de-!-ed compact [[n],[1,0,1]] — the de-layer rule's
+  // over-budget form, which preserves n in r0 (e.g. !Aa300).
+  function bangAaInteger(n, layer) {
+    if (n + 1 <= MetaNum.maxCols) {
+      var coeffs = [];
+      for (var i = 0; i < n; i++) coeffs.push(0);
+      coeffs.push(1);
+      var v = Q._hyperopFromOrdinalRaw(MetaNum.TEN.clone(), MetaNum.TEN.clone(), coeffs);
+      v.layer = layer || 0;
+      return v;
+    }
+    return new MetaNum({ sign: 1, layer: (layer || 0) + 1, array: [[n], [1, 0, 1]] });
+  }
+
+  // Build the error thrown when a value has no faithful BEAF text form.
+  function unrepresentableToBeaf(x) {    var err = new Error(metaNumError + 'toBeaf: value has no BEAF representation ' +
+      '(multi-row / layered internal form cannot be encoded as {a,b,...})');
+    err.name = 'MetaNumUnrepresentableError';
+    err.code = 'METANUM_UNREPRESENTABLE';
+    return err;
+  }
 
   // Convert to BEAF string: {a,b,c,...}
   P.toBeaf = function() {
     var x = this.clone().normalize();
     if (x.isNaN()) return 'NaN';
+    // issue #21: a negative value keeps its sign — "-" prefixed to the BEAF of
+    // its magnitude — instead of silently dropping it (MetaNum(-5) used to
+    // come back as "{5}").  sign -2 is the negative sub-unit case, which the
+    // recursive call spells as "-{…}⁻¹".
+    if (x.sign === -1 || x.sign === -2) {
+      var pos = x.clone();
+      pos.sign = (x.sign === -1) ? 1 : 2;
+      return '-' + pos.toBeaf();
+    }
+    // issue #21: a sub-unit value (sign 2 — r0 holds the RECIPROCAL) spells the
+    // BEAF of the value it represents with a "⁻¹" suffix:
+    //   MetaNum("1e-320") → "{10,320}⁻¹"   (reciprocal 10^320 = {10,320})
+    //   MetaNum("0.001")  → "{1000}⁻¹"     (reciprocal 1000 < MSI)
+    // instead of dropping the sign and printing the bare reciprocal.
+    var suffix = '';
+    if (x.sign === 2) {
+      if (!(x.layer === 0 && x.array.length === 1)) throw unrepresentableToBeaf(x);
+      suffix = '\u207B\u00B9';
+      x = x.rec();
+    }
     if (x.layer === 0 && x.array.length === 1) {
       if (x.eq(MetaNum.ZERO)) return '{0}';
-      return '{' + decimalPlaces(x.array[0][0], 6) + '}';
-    }
-    if (x.layer > 0 || x.array.length > 1) {
-      if (x.array.length === 2 && x.array[1].length >= 3) {
-        var row = x.array[1];
-        var diag = row[row.length - 1];
-        if (diag === 1 && row[0] === 1) {
-          var vals = row.slice(1, row.length - 1);
-          var allNonNegative = true;
-          for (var i = 0; i < vals.length; i++) {
-            if (vals[i] < 0) { allNonNegative = false; break; }
-          }
-          if (allNonNegative) {
-            var a = decimalPlaces(x.array[0][0], 6);
-            // Reconstruct BEAF: {a, ?, c, d, e, ...} from ordinal row [1, c, d, e, ..., 1]
-            // (issues.md convention: BEAF(a,b,c,d,...) = a{...+ω*(d-1)+c}b)
-            var beafParts = [a, '?'];
-            for (var i = 0; i < vals.length; i++) {
-              beafParts.push(String(vals[i]));
-            }
-            beafParts.push(String(diag));
-            return '{' + beafParts.join(', ') + '}';
-          }
-        }
+      var r0 = x.array[0];
+      // [e, 1] is exactly 10^e = BEAF {10, e}. Keep the base instead of
+      // dropping it and emitting the bare exponent (issue #17 D02:
+      // BEAF(10,16) used to come back as "{16}"). Only a positive value with a
+      // round-trippable argument (e >= 1) is encoded this way; everything else
+      // keeps the historical decimal approximation of the leading term.
+      if (x.sign === 1 && r0.length === 2 && r0[1] === 1 &&
+          typeof r0[0] === 'number' && isFinite(r0[0]) && r0[0] >= 1) {
+        return '{10,' + decimalPlaces(r0[0], 6) + '}' + suffix;
       }
+      return '{' + decimalPlaces(r0[0], 6) + '}' + suffix;
     }
-    return '{' + x.array.map(function(r) {
-      return '[' + r.map(function(v) { return decimalPlaces(v, 6); }).join(', ') + ']';
-    }).join(', ') + '}';
+    // A multi-row / layered value has no faithful BEAF text: the ordinal-row
+    // form does not determine the BEAF iteration count `b`, and dumping the
+    // internal rows is never acceptable output (issue #17 D03). Fail loudly
+    // instead of emitting `[...]` literals or a placeholder `?` argument.
+    throw unrepresentableToBeaf(x);
   };
 
 
@@ -6088,7 +6913,12 @@
       }
 
       var temp;
+      // Public primitive input: a numeric literal / decimal string in (0,1) or
+      // (-1,0) is stored as the reciprocal with sign 2 / -2.  Array/object input
+      // (engine internals, JSON, parsers) is left exactly as given.
+      var publicInput = false;
       if (typeof input === "number" && input2 === undefined) {
+        publicInput = true;
         temp = objectCreate();
         temp.array = [[Math.abs(input)]];
         temp.sign = input < 0 ? -1 : 1;
@@ -6098,6 +6928,7 @@
       } else if (parsedObject) {
         temp = Q.fromObject(parsedObject);
       } else if (typeof input === "string") {
+        publicInput = true;
         temp = Q.fromString(input);
       } else if (Array.isArray(input)) {
         temp = Q.fromArray(input, input2, input3);
@@ -6106,6 +6937,7 @@
       } else if (typeof input === "object" && input !== null) {
         temp = Q.fromObject(input);
       } else {
+        publicInput = true;
         temp = objectCreate();
         var num = Number(input);
         if (!isNaN(num) && isFinite(num)) {
@@ -6121,6 +6953,7 @@
           temp.sign = num < 0 ? -1 : 1;
         }
       }
+      if (publicInput) canonicalizeSubUnit(temp);
 
       x.array = deepCloneArray(temp.array);
       x.sign = temp.sign;
@@ -6300,6 +7133,60 @@
 
   MetaNum = clone(MetaNum);
   MetaNum = defineConstants(MetaNum);
+
+  // Sub-unit canonical form: the engine's structural CONSUMERS (gamma, slog,
+  // layeradd, pentate_log, …) read r0 as a plain magnitude, so they run with it
+  // off — otherwise they saw reciprocals where they expected values (gamma(0.5)
+  // read r0 [2] as 2).  The PRODUCERS (constructor, arithmetic, log10/ln/exp,
+  // root, neg) stay canonicalized, so MetaNum(0.5).sign === 2.
+  (function () {
+    var rawConsumers = [
+      'gamma', 'lambertw', 'slog', 'layeradd', 'layeradd10',
+      'pentate', 'pentate_log', 'pentate_root', 'ssrt', 'linear_sroot',
+      'hyper_log', 'hyper_root', 'tetrate', 'expande', 'explode',
+      'expandainate', 'expoiter', 'slayer', 'fastest_hypergrow',
+      'logBase', 'mod', 'arrow'
+    ];
+    for (var ri = 0; ri < rawConsumers.length; ri++) {
+      var name = rawConsumers[ri];
+      var fn = P[name];
+      if (typeof fn !== 'function') continue;
+      P[name] = (function (orig) {
+        return function () {
+          _skipCanon++;
+          var out;
+          try { out = orig.apply(this, arguments); }
+          finally { _skipCanon--; }
+          // The hyper-op builders (arrow, tetrate, expande, …) return a
+          // CLOSURE that carries out the real computation — the guard is gone
+          // by then, so the chain ran canonicalized and drifted by an ULP
+          // (4{25}4 → 153.906997547968 instead of …802).  Re-arm around it.
+          if (typeof out === 'function') {
+            return function () {
+              _skipCanon++;
+              try { return out.apply(this, arguments); }
+              finally { _skipCanon--; }
+            };
+          }
+          return out;
+        };
+      })(fn);
+    }
+    // Q-level entry points that drive the same structural machinery
+    var rawStatics = ['BEAF', '_beafRecursive', 'arrow', 'beaf'];
+    for (var si = 0; si < rawStatics.length; si++) {
+      var sfn = Q[rawStatics[si]];
+      if (typeof sfn !== 'function') continue;
+      Q[rawStatics[si]] = (function (orig) {
+        return function () {
+          _skipCanon++;
+          try { return orig.apply(this, arguments); }
+          finally { _skipCanon--; }
+        };
+      })(sfn);
+    }
+  })();
+
   MetaNum['default'] = MetaNum.MetaNum = MetaNum;
 
   if (typeof define == 'function' && define.amd) {
